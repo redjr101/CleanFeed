@@ -3,22 +3,38 @@
 <head>
 <meta charset="UTF-8">
 <title>CleanFeed</title>
+
 <meta name="viewport" content="width=device-width,initial-scale=1">
 
+<link rel="manifest" href="manifest.json">
+
 <style>
+
+:root{
+--bg:#15202b;
+--text:#ffffff;
+--border:#38444d;
+--accent:#1da1f2;
+}
+
+.light{
+--bg:#ffffff;
+--text:#000000;
+--border:#e6ecf0;
+}
 
 body{
 margin:0;
 font-family:-apple-system,BlinkMacSystemFont,system-ui;
-background:#15202b;
-color:white;
+background:var(--bg);
+color:var(--text);
 }
 
 header{
 position:sticky;
 top:0;
-background:#15202b;
-border-bottom:1px solid #38444d;
+background:var(--bg);
+border-bottom:1px solid var(--border);
 padding:14px;
 display:flex;
 justify-content:space-between;
@@ -35,6 +51,589 @@ margin:auto;
 
 .tweet{
 display:flex;
+padding:14px;
+border-bottom:1px solid var(--border);
+cursor:pointer;
+}
+
+.avatar{
+width:48px;
+height:48px;
+border-radius:50%;
+margin-right:12px;
+}
+
+.content{
+flex:1;
+}
+
+.name{
+font-weight:bold;
+}
+
+.handle{
+color:gray;
+margin-left:6px;
+}
+
+.time{
+color:gray;
+margin-left:6px;
+}
+
+.text{
+margin-top:6px;
+line-height:1.4;
+}
+
+.image{
+margin-top:10px;
+border-radius:12px;
+max-width:100%;
+}
+
+.controls button{
+background:var(--accent);
+border:none;
+padding:6px 10px;
+border-radius:6px;
+color:white;
+cursor:pointer;
+margin-left:6px;
+}
+
+#settingsPanel{
+position:fixed;
+top:0;
+right:0;
+width:320px;
+height:100%;
+background:var(--bg);
+border-left:1px solid var(--border);
+padding:20px;
+display:none;
+overflow:auto;
+}
+
+.settingBlock{
+margin-bottom:20px;
+}
+
+input,select{
+width:100%;
+padding:6px;
+margin-top:4px;
+}
+
+.account{
+display:flex;
+justify-content:space-between;
+margin-top:6px;
+}
+
+.thread{
+padding:20px;
+}
+
+</style>
+</head>
+
+<body>
+
+<header>
+
+<span>CleanFeed</span>
+
+<div class="controls">
+<button onclick="refreshFeed()">Refresh</button>
+<button onclick="toggleSettings()">⚙️</button>
+</div>
+
+</header>
+
+<div id="feed"></div>
+
+<div id="settingsPanel">
+
+<h2>Settings</h2>
+
+<div class="settingBlock">
+<h3>Accounts</h3>
+
+<div id="accountList"></div>
+
+<input id="newAccount" placeholder="Add account">
+
+<button onclick="addAccount()">Add</button>
+
+</div>
+
+<div class="settingBlock">
+
+<h3>Feed Options</h3>
+
+<label>
+<input type="checkbox" id="hideReplies">
+Hide replies
+</label>
+
+</div>
+
+<div class="settingBlock">
+
+<h3>Theme</h3>
+
+<select id="themeSelect">
+<option value="dark">Dark</option>
+<option value="light">Light</option>
+</select>
+
+</div>
+
+<div class="settingBlock">
+
+<h3>Nitter Instance</h3>
+
+<select id="instanceSelect"></select>
+
+</div>
+
+<div class="settingBlock">
+
+<h3>Backup</h3>
+
+<button onclick="exportSettings()">Export</button>
+<button onclick="importSettings()">Import</button>
+
+</div>
+
+</div>
+
+<script>
+
+const INSTANCES=[
+"nitter.tiekoetter.com",
+"nitter.poast.org",
+"nitter.net",
+"nitter.unixfox.eu",
+"nitter.privacydev.net"
+]
+
+const PROXIES=[
+"https://corsproxy.io/?",
+"https://api.allorigins.win/raw?url=",
+"https://proxy.cors.sh/",
+"https://thingproxy.freeboard.io/fetch/"
+]
+
+let settings=JSON.parse(localStorage.getItem("cf_settings")||`{
+"accounts":["RapSheet"],
+"instance":"nitter.tiekoetter.com",
+"hideReplies":true,
+"theme":"dark"
+}`)
+
+let tweets=[]
+let rendered=0
+const PAGE=20
+
+function saveSettings(){
+
+localStorage.setItem("cf_settings",JSON.stringify(settings))
+
+}
+
+function applyTheme(){
+
+document.body.classList.toggle("light",settings.theme==="light")
+
+}
+
+function populateSettings(){
+
+const list=document.getElementById("accountList")
+
+list.innerHTML=""
+
+settings.accounts.forEach(a=>{
+
+const div=document.createElement("div")
+
+div.className="account"
+
+div.innerHTML=`${a} <button onclick="removeAccount('${a}')">x</button>`
+
+list.appendChild(div)
+
+})
+
+document.getElementById("hideReplies").checked=settings.hideReplies
+
+document.getElementById("themeSelect").value=settings.theme
+
+const instSel=document.getElementById("instanceSelect")
+
+instSel.innerHTML=""
+
+INSTANCES.forEach(i=>{
+
+const o=document.createElement("option")
+
+o.value=i
+o.textContent=i
+
+if(i===settings.instance) o.selected=true
+
+instSel.appendChild(o)
+
+})
+
+}
+
+function toggleSettings(){
+
+const p=document.getElementById("settingsPanel")
+
+p.style.display=p.style.display==="block"?"none":"block"
+
+populateSettings()
+
+}
+
+function addAccount(){
+
+const input=document.getElementById("newAccount")
+
+const user=input.value.trim()
+
+if(!user) return
+
+settings.accounts.push(user)
+
+input.value=""
+
+saveSettings()
+
+populateSettings()
+
+loadFeed()
+
+}
+
+function removeAccount(a){
+
+settings.accounts=settings.accounts.filter(x=>x!==a)
+
+saveSettings()
+
+populateSettings()
+
+loadFeed()
+
+}
+
+document.getElementById("hideReplies").onchange=e=>{
+
+settings.hideReplies=e.target.checked
+
+saveSettings()
+
+loadFeed()
+
+}
+
+document.getElementById("themeSelect").onchange=e=>{
+
+settings.theme=e.target.value
+
+saveSettings()
+
+applyTheme()
+
+}
+
+document.getElementById("instanceSelect").onchange=e=>{
+
+settings.instance=e.target.value
+
+saveSettings()
+
+loadFeed()
+
+}
+
+async function proxiedFetch(url){
+
+for(const p of PROXIES){
+
+try{
+
+const target=p.includes("?")
+?p+encodeURIComponent(url)
+:p+url
+
+const r=await fetch(target)
+
+if(r.ok) return r
+
+}catch{}
+
+}
+
+throw new Error("proxy failed")
+
+}
+
+async function fetchFeed(account){
+
+const url=`https://${settings.instance}/${account}/rss`
+
+try{
+
+const r=await proxiedFetch(url)
+
+const xml=await r.text()
+
+return parseRSS(xml,account)
+
+}catch{
+
+return[]
+
+}
+
+}
+
+function parseRSS(xml,account){
+
+const parser=new DOMParser()
+
+const doc=parser.parseFromString(xml,"text/xml")
+
+const items=[...doc.querySelectorAll("item")]
+
+return items.map(i=>{
+
+const title=i.querySelector("title")?.textContent||""
+const link=i.querySelector("link")?.textContent||""
+const pub=i.querySelector("pubDate")?.textContent||""
+
+if(settings.hideReplies && title.startsWith("RT")) return null
+
+let img=null
+
+const m=title.match(/https?:\/\/.*\.(jpg|png|jpeg)/)
+
+if(m) img=m[0]
+
+return{
+
+name:account,
+text:title,
+link,
+image:img,
+date:new Date(pub),
+avatar:`https://unavatar.io/twitter/${account}`
+
+}
+
+}).filter(Boolean)
+
+}
+
+function timeAgo(date){
+
+const s=Math.floor((Date.now()-date)/1000)
+
+if(s<60) return s+"s"
+if(s<3600) return Math.floor(s/60)+"m"
+if(s<86400) return Math.floor(s/3600)+"h"
+return Math.floor(s/86400)+"d"
+
+}
+
+function renderTweet(t){
+
+const d=document.createElement("div")
+
+d.className="tweet"
+
+d.onclick=()=>openThread(t)
+
+d.innerHTML=`
+
+<img class="avatar" src="${t.avatar}">
+
+<div class="content">
+
+<span class="name">${t.name}</span>
+<span class="time">· ${timeAgo(t.date)}</span>
+
+<div class="text">${t.text}</div>
+
+${t.image?`<img class="image" src="${t.image}">`:""}
+
+</div>
+`
+
+return d
+
+}
+
+function renderMore(){
+
+const feed=document.getElementById("feed")
+
+const slice=tweets.slice(rendered,rendered+PAGE)
+
+slice.forEach(t=>feed.appendChild(renderTweet(t)))
+
+rendered+=slice.length
+
+}
+
+function openThread(t){
+
+const feed=document.getElementById("feed")
+
+feed.innerHTML=""
+
+const d=document.createElement("div")
+
+d.className="thread"
+
+d.innerHTML=`
+
+<h3>${t.name}</h3>
+
+<p>${t.text}</p>
+
+<p><a href="${t.link}" target="_blank">Open Tweet</a></p>
+
+<button onclick="goHome()">Back</button>
+
+`
+
+feed.appendChild(d)
+
+}
+
+function goHome(){
+
+rendered=0
+
+document.getElementById("feed").innerHTML=""
+
+renderMore()
+
+}
+
+async function loadFeed(){
+
+tweets=[]
+
+const results=await Promise.all(settings.accounts.map(fetchFeed))
+
+results.forEach(r=>tweets=tweets.concat(r))
+
+tweets.sort((a,b)=>b.date-a.date)
+
+localStorage.setItem("cf_cache",JSON.stringify(tweets))
+
+rendered=0
+
+document.getElementById("feed").innerHTML=""
+
+renderMore()
+
+}
+
+function refreshFeed(){
+
+loadFeed()
+
+}
+
+function loadCache(){
+
+const c=localStorage.getItem("cf_cache")
+
+if(!c) return
+
+tweets=JSON.parse(c).map(t=>({...t,date:new Date(t.date)}))
+
+renderMore()
+
+}
+
+function exportSettings(){
+
+const blob=new Blob([JSON.stringify(settings)],{type:"application/json"})
+
+const url=URL.createObjectURL(blob)
+
+const a=document.createElement("a")
+
+a.href=url
+
+a.download="cleanfeed_settings.json"
+
+a.click()
+
+}
+
+function importSettings(){
+
+const input=document.createElement("input")
+
+input.type="file"
+
+input.onchange=e=>{
+
+const file=e.target.files[0]
+
+const reader=new FileReader()
+
+reader.onload=()=>{
+
+settings=JSON.parse(reader.result)
+
+saveSettings()
+
+applyTheme()
+
+loadFeed()
+
+}
+
+reader.readAsText(file)
+
+}
+
+input.click()
+
+}
+
+window.addEventListener("scroll",()=>{
+
+if(window.innerHeight+window.scrollY>=document.body.offsetHeight-200){
+
+renderMore()
+
+}
+
+})
+
+applyTheme()
+
+loadCache()
+
+loadFeed()
+
+</script>
+
+</body>
+</html>display:flex;
 padding:14px;
 border-bottom:1px solid #38444d;
 cursor:pointer;
