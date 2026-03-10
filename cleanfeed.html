@@ -3,38 +3,269 @@
 <head>
 <meta charset="UTF-8">
 <title>CleanFeed</title>
-
-<meta name="viewport" content="width=device-width,initial-scale=1">
-
-<link rel="manifest" href="manifest.json">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
-
-:root{
---bg:#15202b;
---text:#ffffff;
---border:#38444d;
---accent:#1da1f2;
-}
-
-.light{
---bg:#ffffff;
---text:#000000;
---border:#e6ecf0;
-}
 
 body{
 margin:0;
 font-family:-apple-system,BlinkMacSystemFont,system-ui;
-background:var(--bg);
-color:var(--text);
+background:#15202b;
+color:white;
 }
 
 header{
 position:sticky;
 top:0;
-background:var(--bg);
-border-bottom:1px solid var(--border);
+background:#15202b;
+border-bottom:1px solid #38444d;
+padding:14px;
+display:flex;
+justify-content:space-between;
+align-items:center;
+font-size:20px;
+font-weight:bold;
+}
+
+#feed{
+max-width:600px;
+margin:auto;
+}
+
+.tweet{
+display:flex;
+padding:14px;
+border-bottom:1px solid #38444d;
+cursor:pointer;
+}
+
+.avatar{
+width:48px;
+height:48px;
+border-radius:50%;
+margin-right:12px;
+}
+
+.content{
+flex:1;
+}
+
+.name{
+font-weight:bold;
+}
+
+.time{
+color:#8899a6;
+margin-left:6px;
+}
+
+.text{
+margin-top:6px;
+line-height:1.4;
+}
+
+.image{
+margin-top:10px;
+border-radius:12px;
+max-width:100%;
+}
+
+button{
+background:#1da1f2;
+border:none;
+padding:6px 10px;
+border-radius:6px;
+color:white;
+cursor:pointer;
+margin-left:6px;
+}
+
+</style>
+</head>
+
+<body>
+
+<header>
+
+<span>CleanFeed</span>
+
+<div>
+<button onclick="refreshFeed()">Refresh</button>
+<button onclick="addAccount()">Add</button>
+</div>
+
+</header>
+
+<div id="feed"></div>
+
+<script>
+
+const INSTANCES=[
+"nitter.tiekoetter.com",
+"nitter.poast.org",
+"nitter.net"
+]
+
+const PROXIES=[
+"https://corsproxy.io/?",
+"https://api.allorigins.win/raw?url="
+]
+
+let accounts=JSON.parse(localStorage.getItem("accounts")||'["RapSheet"]')
+
+async function proxiedFetch(url){
+
+for(const p of PROXIES){
+
+try{
+
+const target=p.includes("?")
+?p+encodeURIComponent(url)
+:p+url
+
+const r=await fetch(target)
+
+if(r.ok) return r
+
+}catch{}
+
+}
+
+throw new Error("proxy failed")
+
+}
+
+async function fetchFeed(account){
+
+for(const inst of INSTANCES){
+
+try{
+
+const url=`https://${inst}/${account}/rss`
+
+const r=await proxiedFetch(url)
+
+const xml=await r.text()
+
+return parseRSS(xml,account)
+
+}catch{}
+
+}
+
+return[]
+
+}
+
+function parseRSS(xml,account){
+
+const parser=new DOMParser()
+
+const doc=parser.parseFromString(xml,"text/xml")
+
+const items=[...doc.querySelectorAll("item")]
+
+return items.map(i=>{
+
+const title=i.querySelector("title")?.textContent||""
+const link=i.querySelector("link")?.textContent||""
+const pub=i.querySelector("pubDate")?.textContent||""
+
+return{
+
+name:account,
+text:title,
+link,
+date:new Date(pub),
+avatar:`https://unavatar.io/twitter/${account}`
+
+}
+
+})
+
+}
+
+function timeAgo(date){
+
+const s=Math.floor((Date.now()-date)/1000)
+
+if(s<60) return s+"s"
+if(s<3600) return Math.floor(s/60)+"m"
+if(s<86400) return Math.floor(s/3600)+"h"
+return Math.floor(s/86400)+"d"
+
+}
+
+function renderTweet(t){
+
+const d=document.createElement("div")
+
+d.className="tweet"
+
+d.onclick=()=>window.open(t.link)
+
+d.innerHTML=`
+
+<img class="avatar" src="${t.avatar}">
+
+<div class="content">
+
+<span class="name">${t.name}</span>
+<span class="time">· ${timeAgo(t.date)}</span>
+
+<div class="text">${t.text}</div>
+
+</div>
+`
+
+return d
+
+}
+
+async function loadFeed(){
+
+let tweets=[]
+
+const results=await Promise.all(accounts.map(fetchFeed))
+
+results.forEach(r=>tweets=tweets.concat(r))
+
+tweets.sort((a,b)=>b.date-a.date)
+
+const feed=document.getElementById("feed")
+
+feed.innerHTML=""
+
+tweets.forEach(t=>feed.appendChild(renderTweet(t)))
+
+}
+
+function refreshFeed(){
+
+loadFeed()
+
+}
+
+function addAccount(){
+
+const user=prompt("Account name")
+
+if(!user) return
+
+accounts.push(user)
+
+localStorage.setItem("accounts",JSON.stringify(accounts))
+
+loadFeed()
+
+}
+
+loadFeed()
+
+</script>
+
+</body>
+</html>border-bottom:1px solid var(--border);
 padding:14px;
 display:flex;
 justify-content:space-between;
