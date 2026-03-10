@@ -3,8 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>CleanFeed</title>
-
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 
 <style>
 
@@ -107,6 +106,7 @@ border-bottom:1px solid #38444d;
 
 <div class="controls">
 <button onclick="addAccount()">Add</button>
+<button onclick="toggleReplies()">Replies</button>
 <button onclick="refreshFeed()">Refresh</button>
 </div>
 
@@ -120,7 +120,8 @@ const INSTANCES=[
 'nitter.tiekoetter.com',
 'nitter.poast.org',
 'nitter.net',
-'nitter.unixfox.eu'
+'nitter.unixfox.eu',
+'nitter.privacydev.net'
 ]
 
 const PROXIES=[
@@ -132,6 +133,7 @@ const PROXIES=[
 
 let accounts=JSON.parse(localStorage.getItem('cf_accounts')||'["RapSheet"]')
 
+let hideReplies=true
 let allTweets=[]
 let rendered=0
 const PAGE_SIZE=20
@@ -154,7 +156,7 @@ if(r.ok) return r
 
 }
 
-throw new Error("proxy failed")
+throw new Error("proxy fail")
 
 }
 
@@ -194,6 +196,8 @@ const title=item.querySelector("title")?.textContent||""
 const link=item.querySelector("link")?.textContent||""
 const pub=item.querySelector("pubDate")?.textContent||""
 
+if(hideReplies && title.startsWith("RT")) return null
+
 let image=null
 
 const imgMatch=title.match(/https?:\/\/.*\.(jpg|png|jpeg)/)
@@ -212,7 +216,7 @@ avatar:`https://unavatar.io/twitter/${account}`
 
 }
 
-})
+}).filter(Boolean)
 
 }
 
@@ -221,11 +225,8 @@ function timeAgo(date){
 const seconds=Math.floor((Date.now()-date)/1000)
 
 if(seconds<60) return seconds+"s"
-
 if(seconds<3600) return Math.floor(seconds/60)+"m"
-
 if(seconds<86400) return Math.floor(seconds/3600)+"h"
-
 return Math.floor(seconds/86400)+"d"
 
 }
@@ -304,9 +305,7 @@ feed.appendChild(div)
 function goHome(){
 
 rendered=0
-
 document.getElementById("feed").innerHTML=""
-
 renderMore()
 
 }
@@ -315,13 +314,11 @@ async function loadFeed(){
 
 allTweets=[]
 
-for(const a of accounts){
+const promises=accounts.map(a=>fetchFeed(a))
 
-const tweets=await fetchFeed(a)
+const results=await Promise.all(promises)
 
-allTweets=allTweets.concat(tweets)
-
-}
+results.forEach(r=>allTweets=allTweets.concat(r))
 
 allTweets.sort((a,b)=>b.date-a.date)
 
@@ -350,6 +347,14 @@ if(!user) return
 accounts.push(user)
 
 localStorage.setItem("cf_accounts",JSON.stringify(accounts))
+
+loadFeed()
+
+}
+
+function toggleReplies(){
+
+hideReplies=!hideReplies
 
 loadFeed()
 
