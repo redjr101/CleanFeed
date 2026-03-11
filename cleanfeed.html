@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>CleanFeed — Nitter+Follow</title>
+<title>CleanFeed — Bluesky Reader</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
@@ -15,620 +15,692 @@
 :root {
   --bg: #0d1117; --surface: #161b22; --surface2: #1c2128;
   --border: #30363d; --border2: #21262d;
-  --accent: #58a6ff; --accent2: #1f6feb;
+  --accent: #0085ff; --accent2: #0066cc;
   --green: #3fb950; --red: #f85149;
   --muted: #8b949e; --text: #e6edf3; --text2: #c9d1d9;
 }
-body { background: var(--bg); color: var(--text); font-family: 'IBM Plex Sans', sans-serif; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'IBM Plex Sans', sans-serif; min-height: 100vh; }
+
+/* HEADER */
 .header {
-  position: sticky; top: 0; z-index: 100;
-  height: 56px; background: rgba(13,17,23,0.92);
-  border-bottom: 1px solid var(--border);
-  backdrop-filter: blur(12px);
-  display: flex; align-items: center; padding: 0 20px; gap: 16px;
+  position: sticky; top: 0; z-index: 100; height: 56px;
+  background: rgba(13,17,23,0.93); border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(12px); display: flex; align-items: center; padding: 0 20px; gap: 14px;
 }
-.logo {
-  font-family: 'IBM Plex Mono', monospace; font-size: 20px; font-weight: 600;
-  color: var(--accent); letter-spacing: -0.5px; display: flex; align-items: center; gap: 8px;
-}
-.logo span { color: var(--muted); font-weight: 400; }
-.nav-tabs { display: flex; gap: 4px; margin-left: 8px; }
-.nav-tab {
-  padding: 6px 14px; border-radius: 6px; border: none; cursor: pointer;
-  font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; font-weight: 500;
-  transition: all 0.15s; background: transparent; color: var(--muted);
-}
+.logo { font-family: 'IBM Plex Mono', monospace; font-size: 19px; font-weight: 600; color: var(--accent); display: flex; align-items: center; gap: 9px; letter-spacing: -0.3px; }
+.logo-sub { color: var(--muted); font-weight: 400; font-size: 14px; }
+.nav-tabs { display: flex; gap: 3px; margin-left: 6px; }
+.nav-tab { padding: 6px 13px; border-radius: 6px; border: none; cursor: pointer; font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; font-weight: 500; transition: all 0.15s; background: transparent; color: var(--muted); }
 .nav-tab:hover { background: var(--surface2); color: var(--text); }
 .nav-tab.active { background: var(--accent2); color: white; }
 .header-spacer { flex: 1; }
-.follow-count { font-size: 12px; color: var(--muted); font-family: 'IBM Plex Mono', monospace; }
-.main { display: flex; flex: 1; max-width: 1100px; margin: 0 auto; width: 100%; padding: 24px 16px; gap: 24px; }
-.sidebar { width: 280px; flex-shrink: 0; display: flex; flex-direction: column; gap: 16px; }
-.sidebar-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
-.sidebar-card-header {
-  padding: 14px 16px; border-bottom: 1px solid var(--border2);
-  font-size: 13px; font-weight: 600; color: var(--text2);
-  letter-spacing: 0.3px; text-transform: uppercase;
-  display: flex; align-items: center; gap: 8px;
-}
-.sidebar-card-header .count {
-  background: var(--border); border-radius: 20px; padding: 1px 7px;
-  font-size: 11px; font-family: 'IBM Plex Mono', monospace; color: var(--muted);
-}
-.follow-input-wrap { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
-.input-row { display: flex; gap: 8px; }
-.at-input-wrap {
-  flex: 1; display: flex; align-items: center;
-  background: var(--bg); border: 1px solid var(--border);
-  border-radius: 6px; overflow: hidden; transition: border-color 0.15s;
-}
-.at-input-wrap:focus-within { border-color: var(--accent); }
-.at-prefix {
-  padding: 0 10px; color: var(--muted); font-family: 'IBM Plex Mono', monospace; font-size: 14px;
-  background: var(--surface2); height: 100%; display: flex; align-items: center;
-  border-right: 1px solid var(--border);
-}
-.at-input {
-  flex: 1; padding: 8px 10px; background: transparent; border: none; outline: none;
-  color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: 13px;
-}
-.at-input::placeholder { color: var(--muted); }
-.btn-follow {
-  padding: 8px 14px; border-radius: 6px; border: none;
-  background: var(--accent2); color: white; font-family: 'IBM Plex Sans', sans-serif;
-  font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s; white-space: nowrap;
-}
-.btn-follow:hover { background: var(--accent); }
-.btn-follow:disabled { opacity: 0.5; cursor: not-allowed; }
-.input-note { font-size: 11px; color: var(--muted); }
-.followed-list { display: flex; flex-direction: column; }
-.followed-item {
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px 16px; border-bottom: 1px solid var(--border2); transition: background 0.1s;
-}
-.followed-item:last-child { border-bottom: none; }
-.followed-item:hover { background: var(--surface2); }
-.followed-avatar {
-  width: 34px; height: 34px; border-radius: 50%; background: var(--border);
-  display: flex; align-items: center; justify-content: center;
-  font-family: 'IBM Plex Mono', monospace; font-size: 13px;
-  color: var(--accent); font-weight: 600; flex-shrink: 0;
-}
-.followed-info { flex: 1; min-width: 0; }
-.followed-handle {
-  font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--accent);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.followed-status { font-size: 11px; color: var(--muted); margin-top: 1px; }
-.btn-unfollow {
-  padding: 4px 10px; border-radius: 4px; border: 1px solid var(--border);
-  background: transparent; color: var(--muted); font-size: 11px; cursor: pointer;
-  transition: all 0.15s; font-family: 'IBM Plex Sans', sans-serif;
-}
-.btn-unfollow:hover { border-color: var(--red); color: var(--red); background: rgba(248,81,73,0.08); }
-.btn-load {
-  margin: 10px 16px; padding: 7px; border-radius: 6px;
-  border: 1px solid var(--border); background: var(--surface2);
-  color: var(--text2); font-size: 12px; font-family: 'IBM Plex Sans', sans-serif;
-  cursor: pointer; transition: all 0.15s; text-align: center; display: block; width: calc(100% - 32px);
-}
-.btn-load:hover { border-color: var(--accent); color: var(--accent); }
-.btn-load:disabled { opacity: 0.5; cursor: not-allowed; }
-.empty-sidebar { padding: 24px 16px; text-align: center; color: var(--muted); font-size: 13px; line-height: 1.6; }
-.empty-sidebar strong { color: var(--text2); display: block; margin-bottom: 4px; }
-.feed { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.feed-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
-.feed-title { font-size: 18px; font-weight: 600; font-family: 'IBM Plex Mono', monospace; color: var(--text); }
-.feed-subtitle { font-size: 13px; color: var(--muted); margin-top: 2px; }
-.feed-actions { display: flex; gap: 8px; margin-left: auto; }
-.btn-refresh {
-  padding: 7px 14px; border-radius: 6px; border: 1px solid var(--border);
-  background: var(--surface); color: var(--text2); font-size: 12px;
-  font-family: 'IBM Plex Sans', sans-serif; cursor: pointer; transition: all 0.15s;
-  display: flex; align-items: center; gap: 6px;
-}
-.btn-refresh:hover { border-color: var(--accent); color: var(--accent); }
+.header-badge { font-size: 11px; color: var(--muted); font-family: 'IBM Plex Mono', monospace; background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 3px 10px; }
+
+/* LAYOUT */
+.main { display: flex; max-width: 1080px; margin: 0 auto; width: 100%; padding: 22px 16px; gap: 22px; }
+
+/* SIDEBAR */
+.sidebar { width: 270px; flex-shrink: 0; display: flex; flex-direction: column; gap: 14px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.card-header { padding: 13px 15px; border-bottom: 1px solid var(--border2); font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: 0.8px; text-transform: uppercase; display: flex; align-items: center; gap: 8px; }
+.card-header .pill { background: var(--border); border-radius: 20px; padding: 1px 7px; font-size: 10px; color: var(--muted); font-family: 'IBM Plex Mono', monospace; }
+
+/* FOLLOW INPUT */
+.input-wrap { padding: 13px 15px; display: flex; flex-direction: column; gap: 9px; }
+.input-row { display: flex; gap: 7px; }
+.handle-input-outer { flex: 1; display: flex; align-items: center; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; transition: border-color 0.15s; }
+.handle-input-outer:focus-within { border-color: var(--accent); }
+.handle-prefix { padding: 0 9px; color: var(--muted); font-family: 'IBM Plex Mono', monospace; font-size: 13px; background: var(--surface2); height: 100%; display: flex; align-items: center; border-right: 1px solid var(--border); white-space: nowrap; }
+.handle-input { flex: 1; padding: 8px 9px; background: transparent; border: none; outline: none; color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: 13px; min-width: 0; }
+.handle-input::placeholder { color: var(--muted); }
+.btn-primary { padding: 8px 13px; border-radius: 6px; border: none; background: var(--accent2); color: white; font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+.btn-primary:hover { background: var(--accent); }
+.btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+.input-hint { font-size: 11px; color: var(--muted); line-height: 1.4; }
+.input-hint a { color: var(--accent); text-decoration: none; }
+
+/* FOLLOWING LIST */
+.following-list { display: flex; flex-direction: column; }
+.following-item { display: flex; align-items: center; gap: 9px; padding: 9px 15px; border-bottom: 1px solid var(--border2); transition: background 0.1s; cursor: default; }
+.following-item:last-child { border-bottom: none; }
+.following-item:hover { background: var(--surface2); }
+.avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--border); display: flex; align-items: center; justify-content: center; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--accent); font-weight: 600; flex-shrink: 0; overflow: hidden; }
+.avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+.following-info { flex: 1; min-width: 0; }
+.following-name { font-size: 13px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.following-handle { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.following-status { font-size: 10px; margin-top: 1px; }
+.status-live { color: var(--green); }
+.status-loading { color: var(--muted); }
+.status-err { color: var(--red); }
+.btn-unfollow { padding: 3px 9px; border-radius: 4px; border: 1px solid var(--border); background: transparent; color: var(--muted); font-size: 11px; cursor: pointer; transition: all 0.15s; font-family: 'IBM Plex Sans', sans-serif; flex-shrink: 0; }
+.btn-unfollow:hover { border-color: var(--red); color: var(--red); background: rgba(248,81,73,0.07); }
+.btn-secondary { display: block; margin: 10px 15px; padding: 7px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface2); color: var(--text2); font-size: 12px; font-family: 'IBM Plex Sans', sans-serif; cursor: pointer; transition: all 0.15s; text-align: center; width: calc(100% - 30px); }
+.btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+.btn-secondary:disabled { opacity: 0.45; cursor: not-allowed; }
+.empty-card { padding: 22px 15px; text-align: center; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.empty-card strong { color: var(--text2); display: block; margin-bottom: 4px; font-size: 14px; }
+
+/* FEED */
+.feed { flex: 1; min-width: 0; }
+.feed-top { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
+.feed-title { font-size: 17px; font-weight: 600; font-family: 'IBM Plex Mono', monospace; }
+.feed-sub { font-size: 12px; color: var(--muted); margin-top: 3px; }
+.feed-actions { margin-left: auto; display: flex; gap: 8px; }
+.btn-icon { padding: 7px 13px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text2); font-size: 12px; font-family: 'IBM Plex Sans', sans-serif; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 5px; }
+.btn-icon:hover { border-color: var(--accent); color: var(--accent); }
+.btn-icon:disabled { opacity: 0.4; cursor: not-allowed; }
 @keyframes spin { to { transform: rotate(360deg); } }
-.spinning svg { animation: spin 1s linear infinite; }
-.filter-bar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
-.filter-chip {
-  padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border);
-  background: transparent; color: var(--muted); font-size: 12px; cursor: pointer;
-  font-family: 'IBM Plex Sans', sans-serif; transition: all 0.15s;
-}
-.filter-chip:hover { border-color: var(--accent); color: var(--accent); }
-.filter-chip.active { border-color: var(--accent); background: rgba(88,166,255,0.1); color: var(--accent); }
-@keyframes fadeUp {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-.tweet-card {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 10px; padding: 16px; margin-bottom: 10px;
-  transition: border-color 0.15s; animation: fadeUp 0.3s ease both;
-}
-.tweet-card:hover { border-color: #444d56; }
-.tweet-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-.tweet-avatar {
-  width: 38px; height: 38px; border-radius: 50%; background: var(--border2);
-  display: flex; align-items: center; justify-content: center;
-  font-family: 'IBM Plex Mono', monospace; font-size: 14px;
-  color: var(--accent); font-weight: 600; flex-shrink: 0;
-}
-.tweet-author-wrap { flex: 1; min-width: 0; }
-.tweet-author { font-size: 14px; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.tweet-handle { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--muted); font-weight: 400; }
-.tweet-time { font-size: 12px; color: var(--muted); }
-.tweet-body { font-size: 14px; line-height: 1.65; color: var(--text2); word-break: break-word; white-space: pre-wrap; }
-.tweet-body a { color: var(--accent); text-decoration: none; }
-.tweet-body a:hover { text-decoration: underline; }
-.tweet-footer {
-  margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border2);
-  display: flex; gap: 16px; align-items: center;
-}
-.tweet-source { display: flex; align-items: center; gap: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); }
-.source-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent2); }
-.tweet-link { margin-left: auto; font-size: 12px; color: var(--muted); text-decoration: none; transition: color 0.15s; display: flex; align-items: center; gap: 4px; }
-.tweet-link:hover { color: var(--accent); }
-.feed-empty { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 48px 24px; text-align: center; color: var(--muted); }
-.feed-empty .icon { font-size: 40px; margin-bottom: 16px; }
-.feed-empty strong { color: var(--text2); display: block; font-size: 16px; margin-bottom: 8px; }
-.feed-empty p { font-size: 13px; line-height: 1.6; }
-.loading-bar { height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; margin-bottom: 16px; }
-@keyframes loadbar { 0% { width: 0%; margin-left: 0%; } 50% { width: 60%; margin-left: 20%; } 100% { width: 0%; margin-left: 100%; } }
-.loading-bar-inner { height: 100%; background: var(--accent); animation: loadbar 1.5s ease-in-out infinite; border-radius: 2px; }
-.toast {
-  position: fixed; bottom: 24px; right: 24px;
-  background: var(--surface2); border: 1px solid var(--border);
-  border-radius: 8px; padding: 12px 18px; font-size: 13px; color: var(--text);
-  box-shadow: 0 8px 32px rgba(0,0,0,0.4); z-index: 200;
-  animation: fadeUp 0.25s ease;
-}
-.toast.green { border-color: rgba(63,185,80,0.4); color: var(--green); }
-.toast.red { border-color: rgba(248,81,73,0.4); color: var(--red); }
-.explore-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.spinning svg { animation: spin 0.9s linear infinite; }
+
+/* FILTER CHIPS */
+.filters { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 14px; }
+.chip { padding: 4px 11px; border-radius: 20px; border: 1px solid var(--border); background: transparent; color: var(--muted); font-size: 12px; cursor: pointer; font-family: 'IBM Plex Sans', sans-serif; transition: all 0.15s; }
+.chip:hover { border-color: var(--accent); color: var(--accent); }
+.chip.active { border-color: var(--accent); background: rgba(0,133,255,0.1); color: var(--accent); }
+
+/* LOADING BAR */
+.load-bar { height: 2px; background: var(--border); border-radius: 2px; overflow: hidden; margin-bottom: 14px; }
+@keyframes lbar { 0%{width:0%;margin-left:0%} 50%{width:55%;margin-left:22%} 100%{width:0%;margin-left:100%} }
+.load-bar-inner { height: 100%; background: var(--accent); animation: lbar 1.4s ease-in-out infinite; }
+
+/* POST CARDS */
+@keyframes fadeUp { from{opacity:0;transform:translateY(7px)} to{opacity:1;transform:translateY(0)} }
+.post-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 15px; margin-bottom: 9px; transition: border-color 0.15s; animation: fadeUp 0.25s ease both; }
+.post-card:hover { border-color: #3d444d; }
+.post-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.post-avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--border2); display: flex; align-items: center; justify-content: center; font-family: 'IBM Plex Mono', monospace; font-size: 14px; color: var(--accent); font-weight: 600; flex-shrink: 0; overflow: hidden; }
+.post-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+.post-author-wrap { flex: 1; min-width: 0; }
+.post-name { font-size: 14px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.post-handle { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--muted); }
+.post-time { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.post-body { font-size: 14px; line-height: 1.65; color: var(--text2); word-break: break-word; white-space: pre-wrap; }
+.post-body a { color: var(--accent); text-decoration: none; }
+.post-body a:hover { text-decoration: underline; }
+
+/* IMAGES */
+.post-images { margin-top: 11px; display: grid; gap: 4px; border-radius: 10px; overflow: hidden; border: 1px solid var(--border); }
+.post-images.one { grid-template-columns: 1fr; }
+.post-images.two { grid-template-columns: 1fr 1fr; }
+.post-images.three { grid-template-columns: 1fr 1fr; }
+.post-images.three .img-wrap:first-child { grid-column: 1 / -1; }
+.post-images.four { grid-template-columns: 1fr 1fr; }
+.img-wrap { overflow: hidden; max-height: 280px; }
+.img-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; transition: opacity 0.2s; }
+
+/* QUOTE / REPOST */
+.repost-label { font-size: 12px; color: var(--muted); margin-bottom: 8px; display: flex; align-items: center; gap: 5px; }
+.quote-embed { margin-top: 10px; border: 1px solid var(--border); border-radius: 8px; padding: 11px 13px; background: var(--surface2); }
+.quote-author { font-size: 12px; font-weight: 600; color: var(--text2); margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+.quote-handle { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); font-weight: 400; }
+.quote-body { font-size: 13px; color: var(--muted); line-height: 1.5; }
+
+/* POST FOOTER */
+.post-footer { margin-top: 11px; padding-top: 9px; border-top: 1px solid var(--border2); display: flex; align-items: center; gap: 14px; }
+.post-stat { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
+.post-stat svg { opacity: 0.6; }
+.post-link { margin-left: auto; font-size: 12px; color: var(--muted); text-decoration: none; transition: color 0.15s; display: flex; align-items: center; gap: 3px; }
+.post-link:hover { color: var(--accent); }
+
+/* EMPTY / ERROR STATES */
+.state-box { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 44px 22px; text-align: center; color: var(--muted); }
+.state-box .icon { font-size: 36px; margin-bottom: 14px; }
+.state-box strong { color: var(--text2); display: block; font-size: 15px; margin-bottom: 7px; }
+.state-box p { font-size: 13px; line-height: 1.6; max-width: 320px; margin: 0 auto; }
+.err-msg { background: rgba(248,81,73,0.07); border: 1px solid rgba(248,81,73,0.25); border-radius: 8px; padding: 10px 14px; font-size: 13px; color: var(--red); margin-bottom: 10px; }
+
+/* TOAST */
+.toast { position: fixed; bottom: 22px; right: 22px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 11px 16px; font-size: 13px; color: var(--text); box-shadow: 0 8px 28px rgba(0,0,0,0.45); z-index: 300; animation: fadeUp 0.2s ease; }
+.toast.green { border-color: rgba(63,185,80,0.35); color: var(--green); }
+.toast.red { border-color: rgba(248,81,73,0.35); color: var(--red); }
+
+/* EXPLORE */
+.explore-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px,1fr)); gap: 11px; }
 .explore-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; text-align: center; transition: border-color 0.15s, transform 0.15s; }
 .explore-card:hover { border-color: var(--accent); transform: translateY(-2px); }
-.explore-card-avatar { width: 52px; height: 52px; border-radius: 50%; background: var(--border2); margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; color: var(--accent); font-family: 'IBM Plex Mono', monospace; font-weight: 600; }
-.explore-card-name { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
-.explore-card-handle { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--muted); margin-bottom: 10px; }
-.explore-card-desc { font-size: 12px; color: var(--muted); line-height: 1.5; margin-bottom: 12px; }
-.btn-follow-card { width: 100%; padding: 7px; border-radius: 6px; border: 1px solid var(--accent2); background: transparent; color: var(--accent); font-size: 13px; font-family: 'IBM Plex Sans', sans-serif; font-weight: 500; cursor: pointer; transition: all 0.15s; }
+.explore-avatar { width: 50px; height: 50px; border-radius: 50%; background: var(--border2); margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; color: var(--accent); font-family: 'IBM Plex Mono', monospace; font-weight: 600; overflow: hidden; }
+.explore-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+.explore-name { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+.explore-handle { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+.explore-desc { font-size: 11px; color: var(--muted); line-height: 1.5; margin-bottom: 11px; min-height: 32px; }
+.btn-follow-card { width: 100%; padding: 7px; border-radius: 6px; border: 1px solid var(--accent2); background: transparent; color: var(--accent); font-size: 12px; font-family: 'IBM Plex Sans', sans-serif; font-weight: 500; cursor: pointer; transition: all 0.15s; }
 .btn-follow-card:hover { background: var(--accent2); color: white; }
 .btn-follow-card.following { border-color: var(--border); color: var(--muted); }
 .btn-follow-card.following:hover { border-color: var(--red); color: var(--red); }
-.settings-section { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 16px; }
-.settings-row { display: flex; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--border2); gap: 12px; }
+
+/* SETTINGS */
+.settings-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 14px; }
+.settings-row { display: flex; align-items: center; padding: 13px 17px; border-bottom: 1px solid var(--border2); gap: 12px; }
 .settings-row:last-child { border-bottom: none; }
-.settings-label { flex: 1; }
+.settings-row.col { flex-direction: column; align-items: flex-start; gap: 9px; }
 .settings-label strong { font-size: 14px; display: block; margin-bottom: 2px; }
 .settings-label span { font-size: 12px; color: var(--muted); }
 .toggle { width: 40px; height: 22px; border-radius: 11px; background: var(--border); cursor: pointer; position: relative; transition: background 0.2s; border: none; flex-shrink: 0; }
 .toggle.on { background: var(--accent2); }
-.toggle::after { content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: white; transition: left 0.2s; }
-.toggle.on::after { left: 21px; }
-select.settings-select { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 6px 10px; border-radius: 6px; font-size: 13px; font-family: 'IBM Plex Sans', sans-serif; outline: none; }
-@media (max-width: 700px) {
-  .main { flex-direction: column; padding: 12px; }
-  .sidebar { width: 100%; }
-  .explore-grid { grid-template-columns: 1fr 1fr; }
+.toggle::after { content:''; position:absolute; top:3px; left:3px; width:16px; height:16px; border-radius:50%; background:white; transition:left 0.2s; }
+.toggle.on::after { left:21px; }
+
+@media(max-width:700px) {
+  .main { flex-direction:column; padding:12px; }
+  .sidebar { width:100%; }
+  .explore-grid { grid-template-columns:1fr 1fr; }
 }
 </style>
 </head>
 <body>
 <div id="root"></div>
-
 <script type="text/babel">
-const { useState, useEffect, useCallback } = React;
+const { useState, useEffect, useCallback, useRef } = React;
 
-const CORS_PROXY = "https://api.allorigins.win/get?url=";
+const BSKY_API = "https://public.api.bsky.app/xrpc";
+const CORS_PROXY = "https://corsproxy.io/?";
 
+async function bskyFetch(url) {
+  // Try direct first, fall back to CORS proxy
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
+    if (res.ok) return res;
+    // If blocked by CORS, status will be 0 — try proxy
+  } catch (e) {
+    // Network/CORS error — try proxy
+  }
+  const proxied = await fetch(CORS_PROXY + encodeURIComponent(url), { signal: AbortSignal.timeout(8000) });
+  return proxied;
+}
+
+async function resolveHandle(handle) {
+  const h = handle.replace(/^@/, "").trim().toLowerCase();
+  const full = h.includes(".") ? h : `${h}.bsky.social`;
+  const url = `${BSKY_API}/com.atproto.identity.resolveHandle?handle=${encodeURIComponent(full)}`;
+  let res;
+  try {
+    res = await bskyFetch(url);
+  } catch (e) {
+    throw new Error("Network error — could not reach Bluesky. Check your connection.");
+  }
+  if (res.status === 400) throw new Error(`"${full}" not found on Bluesky`);
+  if (!res.ok) throw new Error(`Bluesky API error: ${res.status}`);
+  const data = await res.json();
+  return { did: data.did, handle: full };
+}
+
+async function getProfile(did) {
+  try {
+    const res = await bskyFetch(`${BSKY_API}/app.bsky.actor.getProfile?actor=${encodeURIComponent(did)}`);
+    if (!res.ok) return null;
+    return res.json();
+  } catch { return null; }
+}
+
+async function getAuthorFeed(did, limit = 25) {
+  const res = await bskyFetch(`${BSKY_API}/app.bsky.feed.getAuthorFeed?actor=${encodeURIComponent(did)}&limit=${limit}&filter=posts_and_author_threads`);
+  if (!res.ok) throw new Error(`Feed error: ${res.status}`);
+  const data = await res.json();
+  return data.feed || [];
+}
 const SUGGESTED = [
-  { handle: "NASA", name: "NASA", desc: "Space exploration, science, technology." },
-  { handle: "BBCBreaking", name: "BBC Breaking News", desc: "Breaking news alerts from BBC News." },
-  { handle: "NatGeo", name: "National Geographic", desc: "Inspiring people to care about the planet." },
-  { handle: "github", name: "GitHub", desc: "Build software. Together." },
-  { handle: "rustlang", name: "Rust Language", desc: "Reliable and efficient software." },
-  { handle: "EFF", name: "EFF", desc: "Defending digital privacy and free speech." },
-  { handle: "wired", name: "WIRED", desc: "We bring you the future as it happens." },
-  { handle: "linux", name: "Linux", desc: "The Linux kernel and open source ecosystem." },
+  { handle: "rapsheet.bsky.social",          name: "Ian Rapoport",     desc: "NFL Network insider. Breaking NFL news." },
+  { handle: "adamschefter.bsky.social",       name: "Adam Schefter",    desc: "ESPN Senior NFL Insider." },
+  { handle: "diannarussini.bsky.social",      name: "Dianna Russini",   desc: "NFL insider for The Athletic." },
+  { handle: "tom-pelissero.bsky.social",      name: "Tom Pelissero",    desc: "NFL Network reporter." },
+  { handle: "mortreport.bsky.social",         name: "Chris Mortensen",  desc: "ESPN NFL analyst & reporter." },
+  { handle: "gregabell.bsky.social",          name: "Greg Abell",       desc: "NFL reporter." },
+  { handle: "eff.org",                        name: "EFF",              desc: "Defending digital rights & privacy." },
+  { handle: "theverge.com",                   name: "The Verge",        desc: "Tech, science, art & culture." },
 ];
 
-function getInitials(handle) { return handle.slice(0, 2).toUpperCase(); }
+// ── API helpers ──────────────────────────────────────────────────────────────
 
-function timeAgo(dateStr) {
+// ── Formatters ───────────────────────────────────────────────────────────────
+
+function timeAgo(isoStr) {
   try {
-    const d = new Date(dateStr);
-    const diff = Date.now() - d.getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return "just now";
-    if (mins < 60) return `${mins}m`;
-    const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return `${hrs}h`;
-    const days = Math.floor(hrs / 24);
-    if (days < 7) return `${days}d`;
-    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    const diff = Date.now() - new Date(isoStr).getTime();
+    const m = Math.floor(diff / 60000);
+    if (m < 1) return "just now";
+    if (m < 60) return `${m}m`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h`;
+    const d = Math.floor(h / 24);
+    if (d < 7) return `${d}d`;
+    return new Date(isoStr).toLocaleDateString("en-US", { month: "short", day: "numeric" });
   } catch { return ""; }
 }
 
-function parseRSS(xml, handle) {
-  try {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(xml, "text/xml");
-    const items = Array.from(doc.querySelectorAll("item"));
-    return items.slice(0, 12).map(item => {
-      const link = item.querySelector("link")?.textContent || "";
-      const pubDate = item.querySelector("pubDate")?.textContent || "";
-      const content = item.querySelector("description")?.textContent || "";
-      const tmp = document.createElement("div");
-      tmp.innerHTML = content;
-      const text = tmp.textContent || "";
-      const creator = item.querySelector("creator")?.textContent || handle;
-      return {
-        id: link + pubDate,
-        handle,
-        author: creator.replace("@", ""),
-        text: text.trim().substring(0, 500),
-        link,
-        time: pubDate,
-      };
-    });
-  } catch { return []; }
+function initials(name) {
+  return (name || "??").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
 }
 
-async function fetchUserFeed(handle, instance) {
-  const rssUrl = `https://${instance}/${handle}/rss`;
-  const res = await fetch(`${CORS_PROXY}${encodeURIComponent(rssUrl)}`);
-  const data = await res.json();
-  return parseRSS(data.contents, handle);
+function linkifyText(text) {
+  if (!text) return "";
+  return text
+    .replace(/https?:\/\/[^\s]+/g, url => `<a href="${url}" target="_blank" rel="noopener">${url}</a>`)
+    .replace(/@([a-zA-Z0-9._-]+)/g, (_, h) => `<a href="https://bsky.app/profile/${h}" target="_blank" rel="noopener">@${h}</a>`);
 }
 
-function getDemoTweets(handle) {
-  const now = new Date();
-  return [
-    {
-      id: `${handle}-1`, handle, author: handle,
-      text: `Demo post from @${handle}. In production, real tweets are fetched via Nitter's RSS feed and aggregated into your timeline here.`,
-      link: `https://nitter.net/${handle}`,
-      time: new Date(now - 1000 * 60 * 20).toISOString(),
-    },
-    {
-      id: `${handle}-2`, handle, author: handle,
-      text: `Another demo post from @${handle}. Follow more accounts to build a richer chronological timeline — all without a Twitter account.`,
-      link: `https://nitter.net/${handle}`,
-      time: new Date(now - 1000 * 60 * 60 * 4).toISOString(),
-    }
-  ];
+// ── Icons ────────────────────────────────────────────────────────────────────
+
+function IconRefresh() {
+  return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>;
+}
+function IconHeart() { return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>; }
+function IconRepost() { return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>; }
+function IconReply() { return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>; }
+function IconSky() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z" fill="currentColor" opacity="0"/><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" fill="none"/><path d="M8 9c0 0 1.5 3 4 3s4-3 4-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none"/><path d="M12 12v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>;
 }
 
-function RefreshIcon() {
+// ── Post Card ────────────────────────────────────────────────────────────────
+
+function PostCard({ item, delay }) {
+  const reason = item.reason;
+  const post = item.post;
+  const record = post?.record;
+  if (!post || !record) return null;
+
+  const isRepost = reason?.$type === "app.bsky.feed.defs#reasonRepost";
+  const author = isRepost ? reason.by : post.author;
+  const displayAuthor = post.author;
+
+  const images = post.embed?.images || post.embed?.media?.images || [];
+  const quotePost = post.embed?.record?.value || null;
+  const quoteAuthor = post.embed?.record?.author || null;
+
+  const bskyUrl = `https://bsky.app/profile/${displayAuthor.handle}/post/${post.uri.split("/").pop()}`;
+
   return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="23 4 23 10 17 10"/>
-      <polyline points="1 20 1 14 7 14"/>
-      <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
-    </svg>
+    <div className="post-card" style={{ animationDelay: `${delay * 0.035}s` }}>
+      {isRepost && (
+        <div className="repost-label">
+          <IconRepost /> <span style={{color:"var(--muted)"}}>Reposted by</span> <strong style={{color:"var(--text2)"}}>{author.displayName || author.handle}</strong>
+        </div>
+      )}
+      <div className="post-meta">
+        <div className="post-avatar">
+          {displayAuthor.avatar
+            ? <img src={displayAuthor.avatar} alt="" loading="lazy" />
+            : initials(displayAuthor.displayName || displayAuthor.handle)
+          }
+        </div>
+        <div className="post-author-wrap">
+          <div className="post-name">{displayAuthor.displayName || displayAuthor.handle}</div>
+          <div className="post-handle">@{displayAuthor.handle}</div>
+        </div>
+        <div className="post-time">{timeAgo(record.createdAt)}</div>
+      </div>
+
+      {record.text && (
+        <div className="post-body" dangerouslySetInnerHTML={{ __html: linkifyText(record.text) }} />
+      )}
+
+      {images.length > 0 && (
+        <div className={`post-images ${["","one","two","three","four"][Math.min(images.length,4)]}`}>
+          {images.slice(0,4).map((img, i) => (
+            <div key={i} className="img-wrap">
+              <img src={img.fullsize || img.thumb} alt={img.alt || ""} loading="lazy" />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {quotePost && quoteAuthor && (
+        <div className="quote-embed">
+          <div className="quote-author">
+            {quoteAuthor.displayName || quoteAuthor.handle}
+            <span className="quote-handle">@{quoteAuthor.handle}</span>
+          </div>
+          <div className="quote-body">{quotePost.text?.slice(0, 220)}{quotePost.text?.length > 220 ? "…" : ""}</div>
+        </div>
+      )}
+
+      <div className="post-footer">
+        <div className="post-stat"><IconReply />{post.replyCount ?? 0}</div>
+        <div className="post-stat"><IconRepost />{post.repostCount ?? 0}</div>
+        <div className="post-stat"><IconHeart />{post.likeCount ?? 0}</div>
+        <a className="post-link" href={bskyUrl} target="_blank" rel="noopener noreferrer">View on Bluesky ↗</a>
+      </div>
+    </div>
   );
 }
 
-function BirdIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-      <path d="M23 3a10.9 10.9 0 01-3.14 1.53 4.48 4.48 0 00-7.86 3v1A10.66 10.66 0 013 4s-4 9 5 13a11.64 11.64 0 01-7 2c9 5 20 0 20-11.5a4.5 4.5 0 00-.08-.83A7.72 7.72 0 0023 3z"
-        stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
-  );
-}
+// ── Main App ─────────────────────────────────────────────────────────────────
 
-export default function App() {
-  const [followed, setFollowed] = useState(["NASA", "github"]);
+function App() {
+  const [accounts, setAccounts] = useState([]); // [{handle, did, profile, status}]
   const [inputVal, setInputVal] = useState("");
-  const [tweets, setTweets] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [inputErr, setInputErr] = useState("");
+  const [inputLoading, setInputLoading] = useState(false);
+  const [feedItems, setFeedItems] = useState([]); // [{...item, _handle}]
+  const [loadingSet, setLoadingSet] = useState(new Set());
   const [activeTab, setActiveTab] = useState("feed");
   const [filterHandle, setFilterHandle] = useState("all");
   const [toast, setToast] = useState(null);
-  const [accountStatuses, setAccountStatuses] = useState({});
-  const [loadingAccounts, setLoadingAccounts] = useState({});
-  const [settings, setSettings] = useState({ sortByNew: true, nitterInstance: "nitter.net" });
+  const [settings, setSettings] = useState({ sortByNew: true, hideReposts: false });
+  const prevCountRef = useRef(0);
 
   const showToast = (msg, type = "") => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 2800);
   };
 
-  const handleFollow = () => {
-    const handle = inputVal.replace(/^@/, "").trim();
-    if (!handle) return;
-    if (followed.includes(handle)) { showToast(`Already following @${handle}`, "red"); return; }
-    setFollowed(f => [...f, handle]);
-    setInputVal("");
-    showToast(`Now following @${handle}`, "green");
+  const setLoading = (handle, val) => {
+    setLoadingSet(s => {
+      const n = new Set(s);
+      val ? n.add(handle) : n.delete(handle);
+      return n;
+    });
+  };
+
+  const loadFeed = useCallback(async (account) => {
+    setLoading(account.handle, true);
+    setAccounts(prev => prev.map(a => a.handle === account.handle ? { ...a, status: "loading" } : a));
+    try {
+      const items = await getAuthorFeed(account.did);
+      setFeedItems(prev => {
+        const without = prev.filter(i => i._handle !== account.handle);
+        return [...without, ...items.map(i => ({ ...i, _handle: account.handle }))];
+      });
+      setAccounts(prev => prev.map(a => a.handle === account.handle ? { ...a, status: "live" } : a));
+    } catch (e) {
+      setAccounts(prev => prev.map(a => a.handle === account.handle ? { ...a, status: "error" } : a));
+    } finally {
+      setLoading(account.handle, false);
+    }
+  }, []);
+
+  const refreshAll = useCallback(async () => {
+    setFeedItems([]);
+    await Promise.all(accounts.map(a => loadFeed(a)));
+  }, [accounts, loadFeed]);
+
+  // Load feed for newly added account
+  useEffect(() => {
+    if (accounts.length > prevCountRef.current && accounts.length > 0) {
+      const newest = accounts[accounts.length - 1];
+      loadFeed(newest);
+    }
+    prevCountRef.current = accounts.length;
+  }, [accounts.length]);
+
+  const handleFollow = async () => {
+    const raw = inputVal.replace(/^@/, "").trim();
+    if (!raw) return;
+    if (accounts.find(a => a.handle === raw || a.handle === `${raw}.bsky.social`)) {
+      setInputErr("Already following this account");
+      return;
+    }
+    setInputErr("");
+    setInputLoading(true);
+    try {
+      const { did, handle } = await resolveHandle(raw);
+      const profile = await getProfile(did);
+      setAccounts(prev => [...prev, { handle, did, profile, status: "loading" }]);
+      setInputVal("");
+      showToast(`Now following @${handle}`, "green");
+    } catch (e) {
+      setInputErr("Error: " + (e?.message || "Unknown error — open browser console for details"));
+    } finally {
+      setInputLoading(false);
+    }
   };
 
   const handleUnfollow = (handle) => {
-    setFollowed(f => f.filter(h => h !== handle));
-    setTweets(t => t.filter(tw => tw.handle !== handle));
+    setAccounts(prev => prev.filter(a => a.handle !== handle));
+    setFeedItems(prev => prev.filter(i => i._handle !== handle));
     showToast(`Unfollowed @${handle}`);
   };
 
-  const loadFeedForAccount = useCallback(async (handle) => {
-    setLoadingAccounts(s => ({ ...s, [handle]: true }));
+  const followFromExplore = async (sugHandle) => {
+    if (accounts.find(a => a.handle === sugHandle || a.handle === `${sugHandle}.bsky.social`)) {
+      handleUnfollow(accounts.find(a => a.handle === sugHandle || a.handle.startsWith(sugHandle))?.handle);
+      return;
+    }
     try {
-      const fetched = await fetchUserFeed(handle, settings.nitterInstance);
-      const result = fetched.length > 0 ? fetched : getDemoTweets(handle);
-      setTweets(prev => [...prev.filter(t => t.handle !== handle), ...result]);
-      setAccountStatuses(s => ({ ...s, [handle]: fetched.length > 0 ? "active" : "demo" }));
+      const { did, handle } = await resolveHandle(sugHandle);
+      const profile = await getProfile(did);
+      setAccounts(prev => [...prev, { handle, did, profile, status: "loading" }]);
+      showToast(`Now following @${handle}`, "green");
     } catch {
-      setTweets(prev => [...prev.filter(t => t.handle !== handle), ...getDemoTweets(handle)]);
-      setAccountStatuses(s => ({ ...s, [handle]: "demo" }));
-    } finally {
-      setLoadingAccounts(s => ({ ...s, [handle]: false }));
+      showToast(`Could not find @${sugHandle} on Bluesky`, "red");
     }
-  }, [settings.nitterInstance]);
+  };
 
-  const refreshAll = useCallback(async () => {
-    setLoading(true);
-    setTweets([]);
-    await Promise.all(followed.map(h => loadFeedForAccount(h)));
-    setLoading(false);
-  }, [followed, loadFeedForAccount]);
+  const isFollowing = (sug) => accounts.some(a => a.handle === sug || a.handle.startsWith(sug.split(".")[0]));
+  const isAnyLoading = loadingSet.size > 0;
 
-  // Initial load
-  useEffect(() => { if (followed.length > 0) refreshAll(); }, []);
-
-  // Load feed when new account is followed
-  const prevLen = React.useRef(followed.length);
-  useEffect(() => {
-    if (followed.length > prevLen.current) {
-      const newHandle = followed[followed.length - 1];
-      loadFeedForAccount(newHandle);
-    }
-    prevLen.current = followed.length;
-  }, [followed.length]);
-
-  const isLoading = loading || Object.values(loadingAccounts).some(Boolean);
-
-  const filteredTweets = tweets
-    .filter(t => filterHandle === "all" || t.handle === filterHandle)
-    .sort((a, b) => settings.sortByNew ? new Date(b.time) - new Date(a.time) : 0);
+  const displayItems = feedItems
+    .filter(i => {
+      if (filterHandle !== "all" && i._handle !== filterHandle) return false;
+      if (settings.hideReposts && i.reason?.$type === "app.bsky.feed.defs#reasonRepost") return false;
+      return true;
+    })
+    .sort((a, b) => settings.sortByNew
+      ? new Date(b.post?.record?.createdAt) - new Date(a.post?.record?.createdAt)
+      : 0
+    );
 
   return (
     <div>
       {/* HEADER */}
       <header className="header">
-        <div className="logo"><BirdIcon />CleanFeed<span>+follow</span></div>
+        <div className="logo">
+          <IconSky />
+          CleanFeed
+          <span className="logo-sub">· Bluesky</span>
+        </div>
         <nav className="nav-tabs">
-          {["feed", "explore", "settings"].map(tab => (
-            <button key={tab} className={`nav-tab${activeTab === tab ? " active" : ""}`}
-              onClick={() => setActiveTab(tab)}>
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+          {["feed","explore","settings"].map(t => (
+            <button key={t} className={`nav-tab${activeTab===t?" active":""}`} onClick={() => setActiveTab(t)}>
+              {t[0].toUpperCase()+t.slice(1)}
             </button>
           ))}
         </nav>
         <div className="header-spacer" />
-        <span className="follow-count">{followed.length} following</span>
+        <span className="header-badge">{accounts.length} following</span>
       </header>
 
       <div className="main">
-        {/* ── FEED TAB ── */}
-        {activeTab === "feed" && (
-          <>
-            <aside className="sidebar">
-              <div className="sidebar-card">
-                <div className="sidebar-card-header">Follow Account</div>
-                <div className="follow-input-wrap">
-                  <div className="input-row">
-                    <div className="at-input-wrap">
-                      <span className="at-prefix">@</span>
-                      <input className="at-input" placeholder="username" value={inputVal}
-                        onChange={e => setInputVal(e.target.value)}
-                        onKeyDown={e => e.key === "Enter" && handleFollow()} />
-                    </div>
-                    <button className="btn-follow" onClick={handleFollow} disabled={!inputVal.trim()}>
-                      Follow
-                    </button>
-                  </div>
-                  <p className="input-note">Fetches posts via Nitter RSS · no Twitter account needed</p>
-                </div>
-              </div>
 
-              <div className="sidebar-card">
-                <div className="sidebar-card-header">
-                  Following <span className="count">{followed.length}</span>
-                </div>
-                {followed.length === 0 ? (
-                  <div className="empty-sidebar">
-                    <strong>No accounts yet</strong>
-                    Follow someone above to start building your timeline.
+        {/* ── FEED TAB ── */}
+        {activeTab === "feed" && <>
+          <aside className="sidebar">
+            {/* Follow input */}
+            <div className="card">
+              <div className="card-header">Follow Account</div>
+              <div className="input-wrap">
+                <div className="input-row">
+                  <div className="handle-input-outer">
+                    <span className="handle-prefix">bsky:</span>
+                    <input className="handle-input" placeholder="user.bsky.social"
+                      value={inputVal}
+                      onChange={e => { setInputVal(e.target.value); setInputErr(""); }}
+                      onKeyDown={e => e.key === "Enter" && handleFollow()} />
                   </div>
-                ) : (
-                  <div className="followed-list">
-                    {followed.map(handle => (
-                      <div key={handle} className="followed-item">
-                        <div className="followed-avatar">{getInitials(handle)}</div>
-                        <div className="followed-info">
-                          <div className="followed-handle">@{handle}</div>
-                          <div className="followed-status">
-                            {loadingAccounts[handle] ? "Loading…" :
-                             accountStatuses[handle] === "demo" ? "Demo mode" : "Active"}
+                  <button className="btn-primary" onClick={handleFollow}
+                    disabled={!inputVal.trim() || inputLoading}>
+                    {inputLoading ? "…" : "Follow"}
+                  </button>
+                </div>
+                {inputErr && <div style={{fontSize:11,color:"var(--red)"}}>{inputErr}</div>}
+                <p className="input-hint">
+                  Handles are lowercase — e.g. <code style={{color:"var(--accent)"}}>rapsheet</code> or <code style={{color:"var(--accent)"}}>adamschefter</code>. No @ needed.
+                </p>
+              </div>
+            </div>
+
+            {/* Following list */}
+            <div className="card">
+              <div className="card-header">
+                Following
+                <span className="pill">{accounts.length}</span>
+              </div>
+              {accounts.length === 0
+                ? <div className="empty-card"><strong>Nobody yet</strong>Follow some accounts above to build your timeline.</div>
+                : <div className="following-list">
+                    {accounts.map(a => (
+                      <div key={a.handle} className="following-item">
+                        <div className="avatar">
+                          {a.profile?.avatar
+                            ? <img src={a.profile.avatar} alt="" />
+                            : initials(a.profile?.displayName || a.handle)
+                          }
+                        </div>
+                        <div className="following-info">
+                          <div className="following-name">{a.profile?.displayName || a.handle}</div>
+                          <div className="following-handle">@{a.handle}</div>
+                          <div className={`following-status ${a.status === "live" ? "status-live" : a.status === "error" ? "status-err" : "status-loading"}`}>
+                            {a.status === "live" ? "✓ Live" : a.status === "error" ? "✗ Error" : "Loading…"}
                           </div>
                         </div>
-                        <button className="btn-unfollow" onClick={() => handleUnfollow(handle)}>Unfollow</button>
+                        <button className="btn-unfollow" onClick={() => handleUnfollow(a.handle)}>–</button>
                       </div>
                     ))}
                   </div>
-                )}
-                {followed.length > 0 && (
-                  <button className="btn-load" onClick={refreshAll} disabled={isLoading}>
-                    {isLoading ? "Refreshing…" : "↻ Refresh all feeds"}
-                  </button>
-                )}
+              }
+              {accounts.length > 0 &&
+                <button className="btn-secondary" onClick={refreshAll} disabled={isAnyLoading}>
+                  {isAnyLoading ? "Refreshing…" : "↻ Refresh all"}
+                </button>
+              }
+            </div>
+          </aside>
+
+          {/* Feed */}
+          <section className="feed">
+            <div className="feed-top">
+              <div>
+                <div className="feed-title">Your Timeline</div>
+                <div className="feed-sub">{displayItems.length} post{displayItems.length !== 1 ? "s" : ""} · live from Bluesky</div>
               </div>
-            </aside>
-
-            <section className="feed">
-              <div className="feed-header">
-                <div>
-                  <div className="feed-title">Your Timeline</div>
-                  <div className="feed-subtitle">{filteredTweets.length} posts · chronological</div>
-                </div>
-                <div className="feed-actions">
-                  <button className={`btn-refresh${isLoading ? " spinning" : ""}`} onClick={refreshAll}>
-                    <RefreshIcon /> Refresh
-                  </button>
-                </div>
+              <div className="feed-actions">
+                <button className={`btn-icon${isAnyLoading?" spinning":""}`} onClick={refreshAll} disabled={isAnyLoading}>
+                  <IconRefresh /> Refresh
+                </button>
               </div>
+            </div>
 
-              {followed.length > 1 && (
-                <div className="filter-bar">
-                  <button className={`filter-chip${filterHandle === "all" ? " active" : ""}`}
-                    onClick={() => setFilterHandle("all")}>All</button>
-                  {followed.map(h => (
-                    <button key={h} className={`filter-chip${filterHandle === h ? " active" : ""}`}
-                      onClick={() => setFilterHandle(h)}>@{h}</button>
-                  ))}
-                </div>
-              )}
+            {accounts.length > 1 &&
+              <div className="filters">
+                <button className={`chip${filterHandle==="all"?" active":""}`} onClick={() => setFilterHandle("all")}>All</button>
+                {accounts.map(a => (
+                  <button key={a.handle} className={`chip${filterHandle===a.handle?" active":""}`}
+                    onClick={() => setFilterHandle(a.handle)}>
+                    @{a.handle.split(".")[0]}
+                  </button>
+                ))}
+              </div>
+            }
 
-              {isLoading && <div className="loading-bar"><div className="loading-bar-inner" /></div>}
+            {isAnyLoading && <div className="load-bar"><div className="load-bar-inner"/></div>}
 
-              {followed.length === 0 ? (
-                <div className="feed-empty">
+            {accounts.length === 0
+              ? <div className="state-box">
                   <div className="icon">📡</div>
                   <strong>Your feed is empty</strong>
-                  <p>Follow some accounts using the sidebar to start seeing their posts here, aggregated into one chronological timeline.</p>
+                  <p>Follow some accounts in the sidebar — posts will appear here in real time, pulled directly from Bluesky's public API.</p>
                 </div>
-              ) : filteredTweets.length === 0 && !isLoading ? (
-                <div className="feed-empty">
-                  <div className="icon">⏳</div>
-                  <strong>No posts loaded yet</strong>
-                  <p>Click Refresh to fetch the latest posts from your followed accounts.</p>
-                </div>
-              ) : filteredTweets.map((tweet, i) => (
-                <div key={tweet.id || i} className="tweet-card" style={{ animationDelay: `${i * 0.04}s` }}>
-                  <div className="tweet-meta">
-                    <div className="tweet-avatar">{getInitials(tweet.handle)}</div>
-                    <div className="tweet-author-wrap">
-                      <div className="tweet-author">
-                        {tweet.author}
-                        <span className="tweet-handle">@{tweet.handle}</span>
-                      </div>
-                      <div className="tweet-time">{timeAgo(tweet.time)}</div>
-                    </div>
+              : displayItems.length === 0 && !isAnyLoading
+                ? <div className="state-box">
+                    <div className="icon">⏳</div>
+                    <strong>No posts yet</strong>
+                    <p>Hit Refresh to pull the latest posts.</p>
                   </div>
-                  <div className="tweet-body">{tweet.text}</div>
-                  <div className="tweet-footer">
-                    <div className="tweet-source"><span className="source-dot" />via Nitter</div>
-                    <a className="tweet-link" href={tweet.link} target="_blank" rel="noopener noreferrer">View post ↗</a>
-                  </div>
-                </div>
-              ))}
-            </section>
-          </>
-        )}
+                : displayItems.map((item, i) => <PostCard key={item.post?.uri || i} item={item} delay={i} />)
+            }
+          </section>
+        </>}
 
         {/* ── EXPLORE TAB ── */}
-        {activeTab === "explore" && (
-          <div style={{ flex: 1 }}>
-            <div className="feed-header" style={{ marginBottom: 20 }}>
+        {activeTab === "explore" &&
+          <div style={{flex:1}}>
+            <div className="feed-top" style={{marginBottom:18}}>
               <div>
-                <div className="feed-title">Explore Accounts</div>
-                <div className="feed-subtitle">Suggested accounts to follow</div>
+                <div className="feed-title">Explore</div>
+                <div className="feed-sub">Suggested Bluesky accounts to follow</div>
               </div>
             </div>
             <div className="explore-grid">
-              {SUGGESTED.map(acct => {
-                const isFollowing = followed.includes(acct.handle);
-                return (
-                  <div key={acct.handle} className="explore-card">
-                    <div className="explore-card-avatar">{getInitials(acct.handle)}</div>
-                    <div className="explore-card-name">{acct.name}</div>
-                    <div className="explore-card-handle">@{acct.handle}</div>
-                    <div className="explore-card-desc">{acct.desc}</div>
-                    <button className={`btn-follow-card${isFollowing ? " following" : ""}`}
-                      onClick={() => {
-                        if (isFollowing) { handleUnfollow(acct.handle); }
-                        else {
-                          setFollowed(f => [...f, acct.handle]);
-                          showToast(`Now following @${acct.handle}`, "green");
-                        }
-                      }}>
-                      {isFollowing ? "Following" : "+ Follow"}
-                    </button>
-                  </div>
-                );
-              })}
+              {SUGGESTED.map(s => (
+                <div key={s.handle} className="explore-card">
+                  <div className="explore-avatar">{initials(s.name)}</div>
+                  <div className="explore-name">{s.name}</div>
+                  <div className="explore-handle">@{s.handle}</div>
+                  <div className="explore-desc">{s.desc}</div>
+                  <button className={`btn-follow-card${isFollowing(s.handle)?" following":""}`}
+                    onClick={() => followFromExplore(s.handle)}>
+                    {isFollowing(s.handle) ? "Following" : "+ Follow"}
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
-        )}
+        }
 
         {/* ── SETTINGS TAB ── */}
-        {activeTab === "settings" && (
-          <div style={{ flex: 1, maxWidth: 500 }}>
-            <div className="feed-header" style={{ marginBottom: 20 }}>
+        {activeTab === "settings" &&
+          <div style={{flex:1, maxWidth:480}}>
+            <div className="feed-top" style={{marginBottom:18}}>
               <div>
                 <div className="feed-title">Settings</div>
-                <div className="feed-subtitle">Customize your CleanFeed experience</div>
+                <div className="feed-sub">Customize your CleanFeed experience</div>
               </div>
             </div>
-            <div className="settings-section">
-              <div className="settings-row">
-                <div className="settings-label">
-                  <strong>Sort Chronologically</strong>
-                  <span>Newest posts appear first</span>
+            <div className="settings-card">
+              {[
+                { key:"sortByNew", label:"Newest First", desc:"Show most recent posts at the top" },
+                { key:"hideReposts", label:"Hide Reposts", desc:"Only show original posts, not reposts" },
+              ].map(({ key, label, desc }) => (
+                <div key={key} className="settings-row">
+                  <div className="settings-label"><strong>{label}</strong><span>{desc}</span></div>
+                  <button className={`toggle${settings[key]?" on":""}`}
+                    onClick={() => setSettings(s => ({ ...s, [key]: !s[key] }))} />
                 </div>
-                <button className={`toggle${settings.sortByNew ? " on" : ""}`}
-                  onClick={() => setSettings(s => ({ ...s, sortByNew: !s.sortByNew }))} />
-              </div>
-              <div className="settings-row">
-                <div className="settings-label">
-                  <strong>Nitter Instance</strong>
-                  <span>Which public instance to use for fetching feeds</span>
-                </div>
-                <select className="settings-select" value={settings.nitterInstance}
-                  onChange={e => setSettings(s => ({ ...s, nitterInstance: e.target.value }))}>
-                  <option value="nitter.net">nitter.net</option>
-                  <option value="nitter.privacydev.net">nitter.privacydev.net</option>
-                  <option value="nitter.poast.org">nitter.poast.org</option>
-                  <option value="nitter.1d4.us">nitter.1d4.us</option>
-                </select>
-              </div>
+              ))}
             </div>
-            <div className="settings-section">
-              <div className="settings-row" style={{ flexDirection: "column", alignItems: "flex-start", gap: 10 }}>
+            <div className="settings-card">
+              <div className="settings-row col">
                 <div className="settings-label">
                   <strong>Export Following List</strong>
-                  <span>Download your followed accounts as JSON</span>
+                  <span>Save your followed accounts as JSON</span>
                 </div>
-                <button className="btn-refresh" onClick={() => {
-                  const blob = new Blob([JSON.stringify({ following: followed }, null, 2)], { type: "application/json" });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement("a"); a.href = url; a.download = "cleanfeed-following.json"; a.click();
+                <button className="btn-icon" onClick={() => {
+                  const data = JSON.stringify({ following: accounts.map(a => a.handle) }, null, 2);
+                  const url = URL.createObjectURL(new Blob([data], { type:"application/json" }));
+                  Object.assign(document.createElement("a"), { href:url, download:"cleanfeed-following.json" }).click();
                 }}>Export following.json</button>
               </div>
-              <div className="settings-row" style={{ flexDirection: "column", alignItems: "flex-start", gap: 10 }}>
+              <div className="settings-row col">
                 <div className="settings-label">
-                  <strong>Clear All Followed Accounts</strong>
-                  <span>Remove everyone from your follow list</span>
+                  <strong>Clear Everything</strong>
+                  <span>Remove all followed accounts and posts</span>
                 </div>
-                <button className="btn-refresh" style={{ color: "var(--red)", borderColor: "rgba(248,81,73,0.4)" }}
-                  onClick={() => { setFollowed([]); setTweets([]); showToast("Cleared all accounts", "red"); }}>
+                <button className="btn-icon" style={{color:"var(--red)",borderColor:"rgba(248,81,73,0.3)"}}
+                  onClick={() => { setAccounts([]); setFeedItems([]); showToast("Cleared", "red"); }}>
                   Clear all
                 </button>
               </div>
             </div>
+            <div className="settings-card">
+              <div className="settings-row">
+                <div className="settings-label">
+                  <strong>Powered by Bluesky</strong>
+                  <span>Uses the free public AT Protocol API — no account or API key needed</span>
+                </div>
+                <a href="https://bsky.app" target="_blank" rel="noopener" style={{color:"var(--accent)",fontSize:12,textDecoration:"none"}}>bsky.app ↗</a>
+              </div>
+            </div>
           </div>
-        )}
+        }
       </div>
 
-      {toast && <div className={`toast${toast.type ? ` ${toast.type}` : ""}`}>{toast.msg}</div>}
+      {toast && <div className={`toast${toast.type?" "+toast.type:""}`}>{toast.msg}</div>}
     </div>
   );
 }
 
-const root = ReactDOM.createRoot(document.getElementById("root"));
-root.render(<App />);
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 </script>
 </body>
 </html>
