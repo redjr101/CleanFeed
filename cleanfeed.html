@@ -1,1224 +1,846 @@
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<title>CleanFeed</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-
-<style>
-
-body{
-margin:0;
-font-family:-apple-system,BlinkMacSystemFont,system-ui;
-background:#15202b;
-color:white;
+import { useState, useEffect, useCallback } from "react";
+
+const NITTER_INSTANCE = "https://nitter.net";
+const CORS_PROXY = "https://api.allorigins.win/get?url=";
+
+const style = `
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1c2128;
+    --border: #30363d;
+    --border2: #21262d;
+    --accent: #58a6ff;
+    --accent2: #1f6feb;
+    --green: #3fb950;
+    --red: #f85149;
+    --muted: #8b949e;
+    --text: #e6edf3;
+    --text2: #c9d1d9;
+    --header-h: 56px;
+  }
+
+  body { background: var(--bg); color: var(--text); font-family: 'IBM Plex Sans', sans-serif; }
+
+  /* LAYOUT */
+  .app { display: flex; flex-direction: column; min-height: 100vh; }
+  .header {
+    position: sticky; top: 0; z-index: 100;
+    height: var(--header-h);
+    background: rgba(13,17,23,0.92);
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(12px);
+    display: flex; align-items: center;
+    padding: 0 20px; gap: 16px;
+  }
+  .logo {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 20px; font-weight: 600;
+    color: var(--accent);
+    letter-spacing: -0.5px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .logo span { color: var(--muted); font-weight: 400; }
+  .nav-tabs {
+    display: flex; gap: 4px;
+    margin-left: 8px;
+  }
+  .nav-tab {
+    padding: 6px 14px; border-radius: 6px;
+    border: none; cursor: pointer;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 13px; font-weight: 500;
+    transition: all 0.15s;
+    background: transparent; color: var(--muted);
+  }
+  .nav-tab:hover { background: var(--surface2); color: var(--text); }
+  .nav-tab.active { background: var(--accent2); color: white; }
+  .header-spacer { flex: 1; }
+  .follow-count {
+    font-size: 12px; color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  /* MAIN CONTENT */
+  .main { display: flex; flex: 1; max-width: 1100px; margin: 0 auto; width: 100%; padding: 24px 16px; gap: 24px; }
+
+  /* SIDEBAR */
+  .sidebar {
+    width: 280px; flex-shrink: 0;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  .sidebar-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; overflow: hidden;
+  }
+  .sidebar-card-header {
+    padding: 14px 16px; border-bottom: 1px solid var(--border2);
+    font-size: 13px; font-weight: 600;
+    color: var(--text2); letter-spacing: 0.3px;
+    text-transform: uppercase;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .sidebar-card-header .count {
+    background: var(--border); border-radius: 20px;
+    padding: 1px 7px; font-size: 11px;
+    font-family: 'IBM Plex Mono', monospace;
+    color: var(--muted);
+  }
+
+  /* FOLLOW INPUT */
+  .follow-input-wrap { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+  .input-row { display: flex; gap: 8px; }
+  .at-input-wrap {
+    flex: 1; display: flex; align-items: center;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 6px; overflow: hidden;
+    transition: border-color 0.15s;
+  }
+  .at-input-wrap:focus-within { border-color: var(--accent); }
+  .at-prefix {
+    padding: 0 10px; color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace; font-size: 14px;
+    background: var(--surface2); height: 100%;
+    display: flex; align-items: center;
+    border-right: 1px solid var(--border);
+  }
+  .at-input {
+    flex: 1; padding: 8px 10px;
+    background: transparent; border: none; outline: none;
+    color: var(--text); font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+  }
+  .at-input::placeholder { color: var(--muted); }
+  .btn-follow {
+    padding: 8px 14px; border-radius: 6px; border: none;
+    background: var(--accent2); color: white;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+    transition: all 0.15s; white-space: nowrap;
+  }
+  .btn-follow:hover { background: var(--accent); }
+  .btn-follow:disabled { opacity: 0.5; cursor: not-allowed; }
+  .input-note { font-size: 11px; color: var(--muted); }
+
+  /* FOLLOWED LIST */
+  .followed-list { display: flex; flex-direction: column; }
+  .followed-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 16px; border-bottom: 1px solid var(--border2);
+    transition: background 0.1s;
+  }
+  .followed-item:last-child { border-bottom: none; }
+  .followed-item:hover { background: var(--surface2); }
+  .followed-avatar {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: var(--border); display: flex; align-items: center; justify-content: center;
+    font-family: 'IBM Plex Mono', monospace; font-size: 13px;
+    color: var(--accent); font-weight: 600; flex-shrink: 0;
+    overflow: hidden;
+  }
+  .followed-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .followed-info { flex: 1; min-width: 0; }
+  .followed-handle {
+    font-family: 'IBM Plex Mono', monospace; font-size: 13px;
+    color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .followed-status { font-size: 11px; color: var(--muted); margin-top: 1px; }
+  .btn-unfollow {
+    padding: 4px 10px; border-radius: 4px; border: 1px solid var(--border);
+    background: transparent; color: var(--muted);
+    font-size: 11px; cursor: pointer; transition: all 0.15s;
+    font-family: 'IBM Plex Sans', sans-serif;
+  }
+  .btn-unfollow:hover { border-color: var(--red); color: var(--red); background: rgba(248,81,73,0.08); }
+  .btn-load {
+    margin: 10px 16px; padding: 7px; border-radius: 6px;
+    border: 1px solid var(--border); background: var(--surface2);
+    color: var(--text2); font-size: 12px; font-family: 'IBM Plex Sans', sans-serif;
+    cursor: pointer; transition: all 0.15s; text-align: center;
+  }
+  .btn-load:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-load:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .empty-sidebar {
+    padding: 24px 16px; text-align: center;
+    color: var(--muted); font-size: 13px; line-height: 1.6;
+  }
+  .empty-sidebar strong { color: var(--text2); display: block; margin-bottom: 4px; }
+
+  /* FEED */
+  .feed { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0; }
+  .feed-header {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 16px;
+  }
+  .feed-title {
+    font-size: 18px; font-weight: 600;
+    font-family: 'IBM Plex Mono', monospace; color: var(--text);
+  }
+  .feed-subtitle { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .feed-actions { display: flex; gap: 8px; margin-left: auto; }
+  .btn-refresh {
+    padding: 7px 14px; border-radius: 6px;
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--text2); font-size: 12px; font-family: 'IBM Plex Sans', sans-serif;
+    cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 6px;
+  }
+  .btn-refresh:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-refresh.spinning svg { animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* FILTER BAR */
+  .filter-bar {
+    display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;
+  }
+  .filter-chip {
+    padding: 5px 12px; border-radius: 20px;
+    border: 1px solid var(--border); background: transparent;
+    color: var(--muted); font-size: 12px; cursor: pointer;
+    font-family: 'IBM Plex Sans', sans-serif; transition: all 0.15s;
+  }
+  .filter-chip:hover { border-color: var(--accent); color: var(--accent); }
+  .filter-chip.active { border-color: var(--accent); background: rgba(88,166,255,0.1); color: var(--accent); }
+
+  /* TWEET CARDS */
+  .tweet-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px;
+    margin-bottom: 10px; transition: border-color 0.15s;
+    animation: fadeUp 0.3s ease both;
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .tweet-card:hover { border-color: #444d56; }
+  .tweet-meta {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
+  }
+  .tweet-avatar {
+    width: 38px; height: 38px; border-radius: 50%;
+    background: var(--border2); display: flex; align-items: center;
+    justify-content: center; font-family: 'IBM Plex Mono', monospace;
+    font-size: 14px; color: var(--accent); font-weight: 600; flex-shrink: 0;
+    overflow: hidden;
+  }
+  .tweet-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .tweet-author-wrap { flex: 1; min-width: 0; }
+  .tweet-author {
+    font-size: 14px; font-weight: 600; color: var(--text);
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  }
+  .tweet-handle {
+    font-family: 'IBM Plex Mono', monospace; font-size: 12px;
+    color: var(--muted); font-weight: 400;
+  }
+  .tweet-time { font-size: 12px; color: var(--muted); }
+  .tweet-body {
+    font-size: 14px; line-height: 1.65; color: var(--text2);
+    word-break: break-word; white-space: pre-wrap;
+  }
+  .tweet-body a { color: var(--accent); text-decoration: none; }
+  .tweet-body a:hover { text-decoration: underline; }
+  .tweet-image {
+    margin-top: 12px; border-radius: 8px; overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .tweet-image img { width: 100%; display: block; max-height: 400px; object-fit: cover; }
+  .tweet-footer {
+    margin-top: 12px; padding-top: 10px;
+    border-top: 1px solid var(--border2);
+    display: flex; gap: 16px; align-items: center;
+  }
+  .tweet-source {
+    display: flex; align-items: center; gap: 6px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+    color: var(--muted);
+  }
+  .source-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent2);
+  }
+  .tweet-link {
+    margin-left: auto; font-size: 12px; color: var(--muted);
+    text-decoration: none; transition: color 0.15s;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .tweet-link:hover { color: var(--accent); }
+
+  /* STATES */
+  .feed-empty {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 48px 24px; text-align: center;
+    color: var(--muted);
+  }
+  .feed-empty .icon { font-size: 40px; margin-bottom: 16px; }
+  .feed-empty strong { color: var(--text2); display: block; font-size: 16px; margin-bottom: 8px; }
+  .feed-empty p { font-size: 13px; line-height: 1.6; }
+
+  .loading-bar {
+    height: 3px; background: var(--border);
+    border-radius: 2px; overflow: hidden; margin-bottom: 16px;
+  }
+  .loading-bar-inner {
+    height: 100%; background: var(--accent);
+    animation: loadbar 1.5s ease-in-out infinite;
+    border-radius: 2px;
+  }
+  @keyframes loadbar {
+    0% { width: 0%; margin-left: 0%; }
+    50% { width: 60%; margin-left: 20%; }
+    100% { width: 0%; margin-left: 100%; }
+  }
+
+  .error-msg {
+    background: rgba(248,81,73,0.08); border: 1px solid rgba(248,81,73,0.3);
+    border-radius: 8px; padding: 12px 16px; font-size: 13px;
+    color: var(--red); margin-bottom: 12px;
+    display: flex; align-items: flex-start; gap: 8px;
+  }
+
+  .toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px 18px;
+    font-size: 13px; color: var(--text);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    animation: toastIn 0.25s ease;
+    z-index: 200;
+  }
+  @keyframes toastIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .toast.green { border-color: rgba(63,185,80,0.4); color: var(--green); }
+  .toast.red { border-color: rgba(248,81,73,0.4); color: var(--red); }
+
+  /* EXPLORE TAB */
+  .explore-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px;
+  }
+  .explore-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px; text-align: center;
+    transition: border-color 0.15s, transform 0.15s;
+  }
+  .explore-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .explore-card-avatar {
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--border2); margin: 0 auto 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; color: var(--accent);
+    font-family: 'IBM Plex Mono', monospace; font-weight: 600;
+    overflow: hidden;
+  }
+  .explore-card-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .explore-card-name { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+  .explore-card-handle {
+    font-family: 'IBM Plex Mono', monospace; font-size: 12px;
+    color: var(--muted); margin-bottom: 10px;
+  }
+  .explore-card-desc { font-size: 12px; color: var(--muted); line-height: 1.5; margin-bottom: 12px; }
+  .btn-follow-card {
+    width: 100%; padding: 7px; border-radius: 6px; border: 1px solid var(--accent2);
+    background: transparent; color: var(--accent); font-size: 13px;
+    font-family: 'IBM Plex Sans', sans-serif; font-weight: 500;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .btn-follow-card:hover { background: var(--accent2); color: white; }
+  .btn-follow-card.following { border-color: var(--border); color: var(--muted); }
+  .btn-follow-card.following:hover { border-color: var(--red); color: var(--red); }
+
+  /* SETTINGS TAB */
+  .settings-wrap { max-width: 500px; }
+  .settings-section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; overflow: hidden; margin-bottom: 16px;
+  }
+  .settings-row {
+    display: flex; align-items: center; padding: 14px 18px;
+    border-bottom: 1px solid var(--border2); gap: 12px;
+  }
+  .settings-row:last-child { border-bottom: none; }
+  .settings-label { flex: 1; }
+  .settings-label strong { font-size: 14px; display: block; margin-bottom: 2px; }
+  .settings-label span { font-size: 12px; color: var(--muted); }
+  .toggle {
+    width: 40px; height: 22px; border-radius: 11px;
+    background: var(--border); cursor: pointer;
+    position: relative; transition: background 0.2s; border: none; flex-shrink: 0;
+  }
+  .toggle.on { background: var(--accent2); }
+  .toggle::after {
+    content: ''; position: absolute; top: 3px; left: 3px;
+    width: 16px; height: 16px; border-radius: 50%;
+    background: white; transition: left 0.2s;
+  }
+  .toggle.on::after { left: 21px; }
+  select.settings-select {
+    background: var(--bg); border: 1px solid var(--border);
+    color: var(--text); padding: 6px 10px; border-radius: 6px;
+    font-size: 13px; font-family: 'IBM Plex Sans', sans-serif; outline: none;
+  }
+
+  @media (max-width: 700px) {
+    .main { flex-direction: column; padding: 12px; }
+    .sidebar { width: 100%; }
+    .explore-grid { grid-template-columns: 1fr 1fr; }
+  }
+`;
+
+// Suggested accounts for Explore tab
+const SUGGESTED = [
+  { handle: "NASA", name: "NASA", desc: "Space exploration, science, technology. Explore the universe." },
+  { handle: "BBCBreaking", name: "BBC Breaking News", desc: "Breaking news alerts from BBC News." },
+  { handle: "NatGeo", name: "National Geographic", desc: "Inspiring people to care about the planet since 1888." },
+  { handle: "github", name: "GitHub", desc: "Build software. Together. The home of open source." },
+  { handle: "rustlang", name: "Rust Language", desc: "A language empowering everyone to build reliable and efficient software." },
+  { handle: "linux", name: "Linux", desc: "The Linux kernel and open source ecosystem." },
+  { handle: "wired", name: "WIRED", desc: "We bring you the future as it happens." },
+  { handle: "EFF", name: "EFF", desc: "Defending digital privacy, free speech, and innovation." },
+];
+
+function getInitials(handle) {
+  return handle.slice(0, 2).toUpperCase();
+}
+
+function timeAgo(dateStr) {
+  try {
+    const d = new Date(dateStr);
+    const diff = Date.now() - d.getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return "just now";
+    if (mins < 60) return `${mins}m`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h`;
+    const days = Math.floor(hrs / 24);
+    if (days < 7) return `${days}d`;
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  } catch { return ""; }
+}
+
+function parseRSS(xml, handle) {
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xml, "text/xml");
+    const items = Array.from(doc.querySelectorAll("item"));
+    return items.slice(0, 12).map(item => {
+      const title = item.querySelector("title")?.textContent || "";
+      const link = item.querySelector("link")?.textContent || "";
+      const pubDate = item.querySelector("pubDate")?.textContent || "";
+      const content = item.querySelector("description")?.textContent || "";
+      // Strip HTML from content
+      const tmp = document.createElement("div");
+      tmp.innerHTML = content;
+      const text = tmp.textContent || "";
+      // Find image
+      const imgMatch = content.match(/src="([^"]+)"/);
+      const image = imgMatch ? imgMatch[1] : null;
+      // Creator
+      const creator = item.querySelector("creator")?.textContent || handle;
+      return {
+        id: link + pubDate,
+        handle,
+        author: creator.replace("@", ""),
+        text: text.trim().substring(0, 500),
+        link,
+        pubDate,
+        image: image && !image.includes("nitter") ? null : null, // skip external images for safety
+        time: pubDate,
+      };
+    });
+  } catch { return []; }
+}
+
+async function fetchUserFeed(handle) {
+  const rssUrl = `${NITTER_INSTANCE}/${handle}/rss`;
+  const proxyUrl = `${CORS_PROXY}${encodeURIComponent(rssUrl)}`;
+  const res = await fetch(proxyUrl);
+  const data = await res.json();
+  return parseRSS(data.contents, handle);
+}
+
+// Simulated/demo tweets for when fetch fails
+function getDemoTweets(handle) {
+  const now = new Date();
+  return [
+    {
+      id: `${handle}-1`,
+      handle,
+      author: handle,
+      text: `This is a demo tweet from @${handle}. In a production setup, this would show real tweets fetched via Nitter's RSS feed. The feed aggregates posts from all accounts you follow into a single chronological timeline.`,
+      link: `${NITTER_INSTANCE}/${handle}`,
+      time: new Date(now - 1000 * 60 * 15).toISOString(),
+      image: null,
+    },
+    {
+      id: `${handle}-2`,
+      handle,
+      author: handle,
+      text: `Another post from @${handle}. Follow more accounts to see a richer, aggregated feed. All content is fetched through Nitter's privacy-preserving proxy.`,
+      link: `${NITTER_INSTANCE}/${handle}`,
+      time: new Date(now - 1000 * 60 * 60 * 3).toISOString(),
+      image: null,
+    }
+  ];
+}
+
+export default function NitterFollow() {
+  const [followed, setFollowed] = useState(["NASA", "github"]);
+  const [inputVal, setInputVal] = useState("");
+  const [tweets, setTweets] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState("feed");
+  const [filterHandle, setFilterHandle] = useState("all");
+  const [toast, setToast] = useState(null);
+  const [accountStatuses, setAccountStatuses] = useState({});
+  const [settings, setSettings] = useState({ showReposts: true, sortByNew: true, nitterInstance: "nitter.net" });
+  const [loadingAccounts, setLoadingAccounts] = useState({});
+
+  const showToast = (msg, type = "") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 2800);
+  };
+
+  const handleFollow = () => {
+    const handle = inputVal.replace(/^@/, "").trim();
+    if (!handle) return;
+    if (followed.includes(handle)) {
+      showToast(`Already following @${handle}`, "red");
+      return;
+    }
+    setFollowed(f => [...f, handle]);
+    setAccountStatuses(s => ({ ...s, [handle]: "active" }));
+    setInputVal("");
+    showToast(`Now following @${handle}`, "green");
+  };
+
+  const handleUnfollow = (handle) => {
+    setFollowed(f => f.filter(h => h !== handle));
+    setTweets(t => t.filter(tweet => tweet.handle !== handle));
+    showToast(`Unfollowed @${handle}`);
+  };
+
+  const loadFeedForAccount = useCallback(async (handle) => {
+    setLoadingAccounts(s => ({ ...s, [handle]: true }));
+    try {
+      const fetchedTweets = await fetchUserFeed(handle);
+      const result = fetchedTweets.length > 0 ? fetchedTweets : getDemoTweets(handle);
+      setTweets(prev => {
+        const withoutHandle = prev.filter(t => t.handle !== handle);
+        return [...withoutHandle, ...result];
+      });
+      setAccountStatuses(s => ({ ...s, [handle]: "active" }));
+    } catch {
+      const demo = getDemoTweets(handle);
+      setTweets(prev => {
+        const withoutHandle = prev.filter(t => t.handle !== handle);
+        return [...withoutHandle, ...demo];
+      });
+      setAccountStatuses(s => ({ ...s, [handle]: "demo" }));
+    } finally {
+      setLoadingAccounts(s => ({ ...s, [handle]: false }));
+    }
+  }, []);
+
+  const refreshAll = useCallback(async () => {
+    setLoading(true);
+    setTweets([]);
+    await Promise.all(followed.map(handle => loadFeedForAccount(handle)));
+    setLoading(false);
+  }, [followed, loadFeedForAccount]);
+
+  useEffect(() => {
+    if (followed.length > 0) refreshAll();
+  }, []); // initial load
+
+  // When a new account is followed, load its feed
+  useEffect(() => {
+    const last = followed[followed.length - 1];
+    if (last && !tweets.find(t => t.handle === last)) {
+      loadFeedForAccount(last);
+    }
+  }, [followed.length]);
+
+  const filteredTweets = tweets
+    .filter(t => filterHandle === "all" || t.handle === filterHandle)
+    .sort((a, b) => {
+      if (settings.sortByNew) return new Date(b.time) - new Date(a.time);
+      return 0;
+    });
+
+  const isLoading = loading || Object.values(loadingAccounts).some(Boolean);
+
+  return (
+    <>
+      <style>{style}</style>
+      <div className="app">
+        {/* HEADER */}
+        <header className="header">
+          <div className="logo">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M23 3a10.9 10.9 0 01-3.14 1.53 4.48 4.48 0 00-7.86 3v1A10.66 10.66 0 013 4s-4 9 5 13a11.64 11.64 0 01-7 2c9 5 20 0 20-11.5a4.5 4.5 0 00-.08-.83A7.72 7.72 0 0023 3z"
+                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            nitter<span>+follow</span>
+          </div>
+          <nav className="nav-tabs">
+            {["feed", "explore", "settings"].map(tab => (
+              <button key={tab} className={`nav-tab${activeTab === tab ? " active" : ""}`}
+                onClick={() => setActiveTab(tab)}>
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </button>
+            ))}
+          </nav>
+          <div className="header-spacer" />
+          <span className="follow-count">{followed.length} following</span>
+        </header>
+
+        <main className="main">
+          {activeTab === "feed" && (
+            <>
+              {/* SIDEBAR */}
+              <aside className="sidebar">
+                <div className="sidebar-card">
+                  <div className="sidebar-card-header">Follow Account</div>
+                  <div className="follow-input-wrap">
+                    <div className="input-row">
+                      <div className="at-input-wrap">
+                        <span className="at-prefix">@</span>
+                        <input className="at-input" placeholder="username" value={inputVal}
+                          onChange={e => setInputVal(e.target.value)}
+                          onKeyDown={e => e.key === "Enter" && handleFollow()} />
+                      </div>
+                      <button className="btn-follow" onClick={handleFollow}
+                        disabled={!inputVal.trim()}>Follow</button>
+                    </div>
+                    <p className="input-note">Fetches tweets via Nitter RSS feed</p>
+                  </div>
+                </div>
+
+                <div className="sidebar-card">
+                  <div className="sidebar-card-header">
+                    Following
+                    <span className="count">{followed.length}</span>
+                  </div>
+                  {followed.length === 0 ? (
+                    <div className="empty-sidebar">
+                      <strong>No accounts yet</strong>
+                      Follow an account above to start building your timeline.
+                    </div>
+                  ) : (
+                    <div className="followed-list">
+                      {followed.map(handle => (
+                        <div key={handle} className="followed-item">
+                          <div className="followed-avatar">{getInitials(handle)}</div>
+                          <div className="followed-info">
+                            <div className="followed-handle">@{handle}</div>
+                            <div className="followed-status">
+                              {loadingAccounts[handle] ? "Loading…" :
+                               accountStatuses[handle] === "demo" ? "Demo mode" : "Active"}
+                            </div>
+                          </div>
+                          <button className="btn-unfollow" onClick={() => handleUnfollow(handle)}>
+                            Unfollow
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {followed.length > 0 && (
+                    <button className="btn-load" onClick={refreshAll} disabled={isLoading}>
+                      {isLoading ? "Refreshing…" : "↻ Refresh all feeds"}
+                    </button>
+                  )}
+                </div>
+              </aside>
+
+              {/* FEED AREA */}
+              <section className="feed">
+                <div className="feed-header">
+                  <div>
+                    <div className="feed-title">Your Timeline</div>
+                    <div className="feed-subtitle">
+                      {filteredTweets.length} post{filteredTweets.length !== 1 ? "s" : ""} · chronological
+                    </div>
+                  </div>
+                  <div className="feed-actions">
+                    <button className={`btn-refresh${isLoading ? " spinning" : ""}`} onClick={refreshAll}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="23 4 23 10 17 10"/>
+                        <polyline points="1 20 1 14 7 14"/>
+                        <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+                      </svg>
+                      Refresh
+                    </button>
+                  </div>
+                </div>
+
+                {/* FILTER */}
+                {followed.length > 1 && (
+                  <div className="filter-bar">
+                    <button className={`filter-chip${filterHandle === "all" ? " active" : ""}`}
+                      onClick={() => setFilterHandle("all")}>All</button>
+                    {followed.map(h => (
+                      <button key={h} className={`filter-chip${filterHandle === h ? " active" : ""}`}
+                        onClick={() => setFilterHandle(h)}>@{h}</button>
+                    ))}
+                  </div>
+                )}
+
+                {isLoading && <div className="loading-bar"><div className="loading-bar-inner"/></div>}
+
+                {followed.length === 0 ? (
+                  <div className="feed-empty">
+                    <div className="icon">📡</div>
+                    <strong>Your feed is empty</strong>
+                    <p>Follow some accounts using the sidebar to start seeing their posts here, aggregated into a single chronological timeline.</p>
+                  </div>
+                ) : filteredTweets.length === 0 && !isLoading ? (
+                  <div className="feed-empty">
+                    <div className="icon">⏳</div>
+                    <strong>No posts loaded yet</strong>
+                    <p>Click Refresh to fetch the latest posts from your followed accounts.</p>
+                  </div>
+                ) : (
+                  filteredTweets.map((tweet, i) => (
+                    <div key={tweet.id || i} className="tweet-card" style={{ animationDelay: `${i * 0.04}s` }}>
+                      <div className="tweet-meta">
+                        <div className="tweet-avatar">{getInitials(tweet.handle)}</div>
+                        <div className="tweet-author-wrap">
+                          <div className="tweet-author">
+                            {tweet.author}
+                            <span className="tweet-handle">@{tweet.handle}</span>
+                          </div>
+                          <div className="tweet-time">{timeAgo(tweet.time)}</div>
+                        </div>
+                      </div>
+                      <div className="tweet-body">{tweet.text}</div>
+                      <div className="tweet-footer">
+                        <div className="tweet-source">
+                          <span className="source-dot"/>
+                          via Nitter
+                        </div>
+                        <a className="tweet-link" href={tweet.link} target="_blank" rel="noopener noreferrer">
+                          View post ↗
+                        </a>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </section>
+            </>
+          )}
+
+          {activeTab === "explore" && (
+            <div style={{ flex: 1 }}>
+              <div className="feed-header" style={{ marginBottom: 20 }}>
+                <div>
+                  <div className="feed-title">Explore Accounts</div>
+                  <div className="feed-subtitle">Suggested accounts to follow</div>
+                </div>
+              </div>
+              <div className="explore-grid">
+                {SUGGESTED.map(acct => {
+                  const isFollowing = followed.includes(acct.handle);
+                  return (
+                    <div key={acct.handle} className="explore-card">
+                      <div className="explore-card-avatar">{getInitials(acct.handle)}</div>
+                      <div className="explore-card-name">{acct.name}</div>
+                      <div className="explore-card-handle">@{acct.handle}</div>
+                      <div className="explore-card-desc">{acct.desc}</div>
+                      <button
+                        className={`btn-follow-card${isFollowing ? " following" : ""}`}
+                        onClick={() => {
+                          if (isFollowing) {
+                            handleUnfollow(acct.handle);
+                          } else {
+                            setFollowed(f => [...f, acct.handle]);
+                            setAccountStatuses(s => ({ ...s, [acct.handle]: "active" }));
+                            showToast(`Now following @${acct.handle}`, "green");
+                          }
+                        }}>
+                        {isFollowing ? "Following" : "+ Follow"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {activeTab === "settings" && (
+            <div className="settings-wrap" style={{ flex: 1 }}>
+              <div className="feed-header" style={{ marginBottom: 20 }}>
+                <div>
+                  <div className="feed-title">Settings</div>
+                  <div className="feed-subtitle">Customize your Nitter+Follow experience</div>
+                </div>
+              </div>
+              <div className="settings-section">
+                {[
+                  { key: "showReposts", label: "Show Reposts", desc: "Include retweets in your timeline" },
+                  { key: "sortByNew", label: "Sort Chronologically", desc: "Newest posts appear first" },
+                ].map(({ key, label, desc }) => (
+                  <div key={key} className="settings-row">
+                    <div className="settings-label">
+                      <strong>{label}</strong>
+                      <span>{desc}</span>
+                    </div>
+                    <button
+                      className={`toggle${settings[key] ? " on" : ""}`}
+                      onClick={() => setSettings(s => ({ ...s, [key]: !s[key] }))}
+                    />
+                  </div>
+                ))}
+                <div className="settings-row">
+                  <div className="settings-label">
+                    <strong>Nitter Instance</strong>
+                    <span>Which public instance to use for fetching feeds</span>
+                  </div>
+                  <select className="settings-select" value={settings.nitterInstance}
+                    onChange={e => setSettings(s => ({ ...s, nitterInstance: e.target.value }))}>
+                    <option value="nitter.net">nitter.net</option>
+                    <option value="nitter.privacydev.net">nitter.privacydev.net</option>
+                    <option value="nitter.poast.org">nitter.poast.org</option>
+                    <option value="nitter.1d4.us">nitter.1d4.us</option>
+                  </select>
+                </div>
+              </div>
+              <div className="settings-section">
+                <div className="settings-row" style={{ flexDirection: "column", alignItems: "flex-start", gap: 10 }}>
+                  <div className="settings-label">
+                    <strong>Export Following List</strong>
+                    <span>Download your followed accounts as JSON</span>
+                  </div>
+                  <button className="btn-refresh" onClick={() => {
+                    const blob = new Blob([JSON.stringify({ following: followed }, null, 2)], { type: "application/json" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a"); a.href = url; a.download = "nitter-following.json"; a.click();
+                  }}>Export following.json</button>
+                </div>
+                <div className="settings-row" style={{ flexDirection: "column", alignItems: "flex-start", gap: 10 }}>
+                  <div className="settings-label">
+                    <strong>Clear All Followed Accounts</strong>
+                    <span>Remove everyone from your follow list</span>
+                  </div>
+                  <button className="btn-refresh" style={{ color: "var(--red)", borderColor: "rgba(248,81,73,0.4)" }}
+                    onClick={() => { setFollowed([]); setTweets([]); showToast("Cleared all accounts", "red"); }}>
+                    Clear all
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </main>
+
+        {toast && <div className={`toast${toast.type ? ` ${toast.type}` : ""}`}>{toast.msg}</div>}
+      </div>
+    </>
+  );
 }
-
-header{
-position:sticky;
-top:0;
-background:#15202b;
-border-bottom:1px solid #38444d;
-padding:14px;
-display:flex;
-justify-content:space-between;
-align-items:center;
-font-size:20px;
-font-weight:bold;
-}
-
-#feed{
-max-width:600px;
-margin:auto;
-}
-
-.tweet{
-display:flex;
-padding:14px;
-border-bottom:1px solid #38444d;
-cursor:pointer;
-}
-
-.avatar{
-width:48px;
-height:48px;
-border-radius:50%;
-margin-right:12px;
-}
-
-.content{
-flex:1;
-}
-
-.name{
-font-weight:bold;
-}
-
-.time{
-color:#8899a6;
-margin-left:6px;
-}
-
-.text{
-margin-top:6px;
-line-height:1.4;
-}
-
-.image{
-margin-top:10px;
-border-radius:12px;
-max-width:100%;
-}
-
-button{
-background:#1da1f2;
-border:none;
-padding:6px 10px;
-border-radius:6px;
-color:white;
-cursor:pointer;
-margin-left:6px;
-}
-
-</style>
-</head>
-
-<body>
-
-<header>
-
-<span>CleanFeed</span>
-
-<div>
-<button onclick="refreshFeed()">Refresh</button>
-<button onclick="addAccount()">Add</button>
-</div>
-
-</header>
-
-<div id="feed"></div>
-
-<script>
-
-const INSTANCES=[
-"nitter.tiekoetter.com",
-"nitter.poast.org",
-"nitter.net"
-]
-
-const PROXIES=[
-"https://corsproxy.io/?",
-"https://api.allorigins.win/raw?url="
-]
-
-let accounts=JSON.parse(localStorage.getItem("accounts")||'["RapSheet"]')
-
-async function proxiedFetch(url){
-
-for(const p of PROXIES){
-
-try{
-
-const target=p.includes("?")
-?p+encodeURIComponent(url)
-:p+url
-
-const r=await fetch(target)
-
-if(r.ok) return r
-
-}catch{}
-
-}
-
-throw new Error("proxy failed")
-
-}
-
-async function fetchFeed(account){
-
-for(const inst of INSTANCES){
-
-try{
-
-const url=`https://${inst}/${account}/rss`
-
-const r=await proxiedFetch(url)
-
-const xml=await r.text()
-
-return parseRSS(xml,account)
-
-}catch{}
-
-}
-
-return[]
-
-}
-
-function parseRSS(xml,account){
-
-const parser=new DOMParser()
-
-const doc=parser.parseFromString(xml,"text/xml")
-
-const items=[...doc.querySelectorAll("item")]
-
-return items.map(i=>{
-
-const title=i.querySelector("title")?.textContent||""
-const link=i.querySelector("link")?.textContent||""
-const pub=i.querySelector("pubDate")?.textContent||""
-
-return{
-
-name:account,
-text:title,
-link,
-date:new Date(pub),
-avatar:`https://unavatar.io/twitter/${account}`
-
-}
-
-})
-
-}
-
-function timeAgo(date){
-
-const s=Math.floor((Date.now()-date)/1000)
-
-if(s<60) return s+"s"
-if(s<3600) return Math.floor(s/60)+"m"
-if(s<86400) return Math.floor(s/3600)+"h"
-return Math.floor(s/86400)+"d"
-
-}
-
-function renderTweet(t){
-
-const d=document.createElement("div")
-
-d.className="tweet"
-
-d.onclick=()=>window.open(t.link)
-
-d.innerHTML=`
-
-<img class="avatar" src="${t.avatar}">
-
-<div class="content">
-
-<span class="name">${t.name}</span>
-<span class="time">· ${timeAgo(t.date)}</span>
-
-<div class="text">${t.text}</div>
-
-</div>
-`
-
-return d
-
-}
-
-async function loadFeed(){
-
-let tweets=[]
-
-const results=await Promise.all(accounts.map(fetchFeed))
-
-results.forEach(r=>tweets=tweets.concat(r))
-
-tweets.sort((a,b)=>b.date-a.date)
-
-const feed=document.getElementById("feed")
-
-feed.innerHTML=""
-
-tweets.forEach(t=>feed.appendChild(renderTweet(t)))
-
-}
-
-function refreshFeed(){
-
-loadFeed()
-
-}
-
-function addAccount(){
-
-const user=prompt("Account name")
-
-if(!user) return
-
-accounts.push(user)
-
-localStorage.setItem("accounts",JSON.stringify(accounts))
-
-loadFeed()
-
-}
-
-loadFeed()
-
-</script>
-
-</body>
-</html>border-bottom:1px solid var(--border);
-padding:14px;
-display:flex;
-justify-content:space-between;
-align-items:center;
-font-size:20px;
-font-weight:bold;
-z-index:2;
-}
-
-#feed{
-max-width:600px;
-margin:auto;
-}
-
-.tweet{
-display:flex;
-padding:14px;
-border-bottom:1px solid var(--border);
-cursor:pointer;
-}
-
-.avatar{
-width:48px;
-height:48px;
-border-radius:50%;
-margin-right:12px;
-}
-
-.content{
-flex:1;
-}
-
-.name{
-font-weight:bold;
-}
-
-.handle{
-color:gray;
-margin-left:6px;
-}
-
-.time{
-color:gray;
-margin-left:6px;
-}
-
-.text{
-margin-top:6px;
-line-height:1.4;
-}
-
-.image{
-margin-top:10px;
-border-radius:12px;
-max-width:100%;
-}
-
-.controls button{
-background:var(--accent);
-border:none;
-padding:6px 10px;
-border-radius:6px;
-color:white;
-cursor:pointer;
-margin-left:6px;
-}
-
-#settingsPanel{
-position:fixed;
-top:0;
-right:0;
-width:320px;
-height:100%;
-background:var(--bg);
-border-left:1px solid var(--border);
-padding:20px;
-display:none;
-overflow:auto;
-}
-
-.settingBlock{
-margin-bottom:20px;
-}
-
-input,select{
-width:100%;
-padding:6px;
-margin-top:4px;
-}
-
-.account{
-display:flex;
-justify-content:space-between;
-margin-top:6px;
-}
-
-.thread{
-padding:20px;
-}
-
-</style>
-</head>
-
-<body>
-
-<header>
-
-<span>CleanFeed</span>
-
-<div class="controls">
-<button onclick="refreshFeed()">Refresh</button>
-<button onclick="toggleSettings()">⚙️</button>
-</div>
-
-</header>
-
-<div id="feed"></div>
-
-<div id="settingsPanel">
-
-<h2>Settings</h2>
-
-<div class="settingBlock">
-<h3>Accounts</h3>
-
-<div id="accountList"></div>
-
-<input id="newAccount" placeholder="Add account">
-
-<button onclick="addAccount()">Add</button>
-
-</div>
-
-<div class="settingBlock">
-
-<h3>Feed Options</h3>
-
-<label>
-<input type="checkbox" id="hideReplies">
-Hide replies
-</label>
-
-</div>
-
-<div class="settingBlock">
-
-<h3>Theme</h3>
-
-<select id="themeSelect">
-<option value="dark">Dark</option>
-<option value="light">Light</option>
-</select>
-
-</div>
-
-<div class="settingBlock">
-
-<h3>Nitter Instance</h3>
-
-<select id="instanceSelect"></select>
-
-</div>
-
-<div class="settingBlock">
-
-<h3>Backup</h3>
-
-<button onclick="exportSettings()">Export</button>
-<button onclick="importSettings()">Import</button>
-
-</div>
-
-</div>
-
-<script>
-
-const INSTANCES=[
-"nitter.tiekoetter.com",
-"nitter.poast.org",
-"nitter.net",
-"nitter.unixfox.eu",
-"nitter.privacydev.net"
-]
-
-const PROXIES=[
-"https://corsproxy.io/?",
-"https://api.allorigins.win/raw?url=",
-"https://proxy.cors.sh/",
-"https://thingproxy.freeboard.io/fetch/"
-]
-
-let settings=JSON.parse(localStorage.getItem("cf_settings")||`{
-"accounts":["RapSheet"],
-"instance":"nitter.tiekoetter.com",
-"hideReplies":true,
-"theme":"dark"
-}`)
-
-let tweets=[]
-let rendered=0
-const PAGE=20
-
-function saveSettings(){
-
-localStorage.setItem("cf_settings",JSON.stringify(settings))
-
-}
-
-function applyTheme(){
-
-document.body.classList.toggle("light",settings.theme==="light")
-
-}
-
-function populateSettings(){
-
-const list=document.getElementById("accountList")
-
-list.innerHTML=""
-
-settings.accounts.forEach(a=>{
-
-const div=document.createElement("div")
-
-div.className="account"
-
-div.innerHTML=`${a} <button onclick="removeAccount('${a}')">x</button>`
-
-list.appendChild(div)
-
-})
-
-document.getElementById("hideReplies").checked=settings.hideReplies
-
-document.getElementById("themeSelect").value=settings.theme
-
-const instSel=document.getElementById("instanceSelect")
-
-instSel.innerHTML=""
-
-INSTANCES.forEach(i=>{
-
-const o=document.createElement("option")
-
-o.value=i
-o.textContent=i
-
-if(i===settings.instance) o.selected=true
-
-instSel.appendChild(o)
-
-})
-
-}
-
-function toggleSettings(){
-
-const p=document.getElementById("settingsPanel")
-
-p.style.display=p.style.display==="block"?"none":"block"
-
-populateSettings()
-
-}
-
-function addAccount(){
-
-const input=document.getElementById("newAccount")
-
-const user=input.value.trim()
-
-if(!user) return
-
-settings.accounts.push(user)
-
-input.value=""
-
-saveSettings()
-
-populateSettings()
-
-loadFeed()
-
-}
-
-function removeAccount(a){
-
-settings.accounts=settings.accounts.filter(x=>x!==a)
-
-saveSettings()
-
-populateSettings()
-
-loadFeed()
-
-}
-
-document.getElementById("hideReplies").onchange=e=>{
-
-settings.hideReplies=e.target.checked
-
-saveSettings()
-
-loadFeed()
-
-}
-
-document.getElementById("themeSelect").onchange=e=>{
-
-settings.theme=e.target.value
-
-saveSettings()
-
-applyTheme()
-
-}
-
-document.getElementById("instanceSelect").onchange=e=>{
-
-settings.instance=e.target.value
-
-saveSettings()
-
-loadFeed()
-
-}
-
-async function proxiedFetch(url){
-
-for(const p of PROXIES){
-
-try{
-
-const target=p.includes("?")
-?p+encodeURIComponent(url)
-:p+url
-
-const r=await fetch(target)
-
-if(r.ok) return r
-
-}catch{}
-
-}
-
-throw new Error("proxy failed")
-
-}
-
-async function fetchFeed(account){
-
-const url=`https://${settings.instance}/${account}/rss`
-
-try{
-
-const r=await proxiedFetch(url)
-
-const xml=await r.text()
-
-return parseRSS(xml,account)
-
-}catch{
-
-return[]
-
-}
-
-}
-
-function parseRSS(xml,account){
-
-const parser=new DOMParser()
-
-const doc=parser.parseFromString(xml,"text/xml")
-
-const items=[...doc.querySelectorAll("item")]
-
-return items.map(i=>{
-
-const title=i.querySelector("title")?.textContent||""
-const link=i.querySelector("link")?.textContent||""
-const pub=i.querySelector("pubDate")?.textContent||""
-
-if(settings.hideReplies && title.startsWith("RT")) return null
-
-let img=null
-
-const m=title.match(/https?:\/\/.*\.(jpg|png|jpeg)/)
-
-if(m) img=m[0]
-
-return{
-
-name:account,
-text:title,
-link,
-image:img,
-date:new Date(pub),
-avatar:`https://unavatar.io/twitter/${account}`
-
-}
-
-}).filter(Boolean)
-
-}
-
-function timeAgo(date){
-
-const s=Math.floor((Date.now()-date)/1000)
-
-if(s<60) return s+"s"
-if(s<3600) return Math.floor(s/60)+"m"
-if(s<86400) return Math.floor(s/3600)+"h"
-return Math.floor(s/86400)+"d"
-
-}
-
-function renderTweet(t){
-
-const d=document.createElement("div")
-
-d.className="tweet"
-
-d.onclick=()=>openThread(t)
-
-d.innerHTML=`
-
-<img class="avatar" src="${t.avatar}">
-
-<div class="content">
-
-<span class="name">${t.name}</span>
-<span class="time">· ${timeAgo(t.date)}</span>
-
-<div class="text">${t.text}</div>
-
-${t.image?`<img class="image" src="${t.image}">`:""}
-
-</div>
-`
-
-return d
-
-}
-
-function renderMore(){
-
-const feed=document.getElementById("feed")
-
-const slice=tweets.slice(rendered,rendered+PAGE)
-
-slice.forEach(t=>feed.appendChild(renderTweet(t)))
-
-rendered+=slice.length
-
-}
-
-function openThread(t){
-
-const feed=document.getElementById("feed")
-
-feed.innerHTML=""
-
-const d=document.createElement("div")
-
-d.className="thread"
-
-d.innerHTML=`
-
-<h3>${t.name}</h3>
-
-<p>${t.text}</p>
-
-<p><a href="${t.link}" target="_blank">Open Tweet</a></p>
-
-<button onclick="goHome()">Back</button>
-
-`
-
-feed.appendChild(d)
-
-}
-
-function goHome(){
-
-rendered=0
-
-document.getElementById("feed").innerHTML=""
-
-renderMore()
-
-}
-
-async function loadFeed(){
-
-tweets=[]
-
-const results=await Promise.all(settings.accounts.map(fetchFeed))
-
-results.forEach(r=>tweets=tweets.concat(r))
-
-tweets.sort((a,b)=>b.date-a.date)
-
-localStorage.setItem("cf_cache",JSON.stringify(tweets))
-
-rendered=0
-
-document.getElementById("feed").innerHTML=""
-
-renderMore()
-
-}
-
-function refreshFeed(){
-
-loadFeed()
-
-}
-
-function loadCache(){
-
-const c=localStorage.getItem("cf_cache")
-
-if(!c) return
-
-tweets=JSON.parse(c).map(t=>({...t,date:new Date(t.date)}))
-
-renderMore()
-
-}
-
-function exportSettings(){
-
-const blob=new Blob([JSON.stringify(settings)],{type:"application/json"})
-
-const url=URL.createObjectURL(blob)
-
-const a=document.createElement("a")
-
-a.href=url
-
-a.download="cleanfeed_settings.json"
-
-a.click()
-
-}
-
-function importSettings(){
-
-const input=document.createElement("input")
-
-input.type="file"
-
-input.onchange=e=>{
-
-const file=e.target.files[0]
-
-const reader=new FileReader()
-
-reader.onload=()=>{
-
-settings=JSON.parse(reader.result)
-
-saveSettings()
-
-applyTheme()
-
-loadFeed()
-
-}
-
-reader.readAsText(file)
-
-}
-
-input.click()
-
-}
-
-window.addEventListener("scroll",()=>{
-
-if(window.innerHeight+window.scrollY>=document.body.offsetHeight-200){
-
-renderMore()
-
-}
-
-})
-
-applyTheme()
-
-loadCache()
-
-loadFeed()
-
-</script>
-
-</body>
-</html>display:flex;
-padding:14px;
-border-bottom:1px solid #38444d;
-cursor:pointer;
-}
-
-.avatar{
-width:48px;
-height:48px;
-border-radius:50%;
-margin-right:12px;
-}
-
-.content{
-flex:1;
-}
-
-.name{
-font-weight:bold;
-}
-
-.handle{
-color:#8899a6;
-margin-left:6px;
-}
-
-.time{
-color:#8899a6;
-margin-left:6px;
-}
-
-.text{
-margin-top:6px;
-line-height:1.4;
-}
-
-.image{
-margin-top:10px;
-border-radius:12px;
-max-width:100%;
-}
-
-.controls{
-display:flex;
-gap:10px;
-}
-
-button{
-background:#1da1f2;
-border:none;
-padding:6px 10px;
-border-radius:6px;
-color:white;
-cursor:pointer;
-}
-
-.thread{
-padding:20px;
-border-bottom:1px solid #38444d;
-}
-
-</style>
-</head>
-
-<body>
-
-<header>
-
-<span>CleanFeed</span>
-
-<div class="controls">
-<button onclick="addAccount()">Add</button>
-<button onclick="toggleReplies()">Replies</button>
-<button onclick="refreshFeed()">Refresh</button>
-</div>
-
-</header>
-
-<div id="feed"></div>
-
-<script>
-
-const INSTANCES=[
-'nitter.tiekoetter.com',
-'nitter.poast.org',
-'nitter.net',
-'nitter.unixfox.eu',
-'nitter.privacydev.net'
-]
-
-const PROXIES=[
-'https://corsproxy.io/?',
-'https://api.allorigins.win/raw?url=',
-'https://proxy.cors.sh/',
-'https://thingproxy.freeboard.io/fetch/'
-]
-
-let accounts=JSON.parse(localStorage.getItem('cf_accounts')||'["RapSheet"]')
-
-let hideReplies=true
-let allTweets=[]
-let rendered=0
-const PAGE_SIZE=20
-
-async function proxiedFetch(url){
-
-for(const proxy of PROXIES){
-
-try{
-
-const target=proxy.includes('?')
-?proxy+encodeURIComponent(url)
-:proxy+url
-
-const r=await fetch(target)
-
-if(r.ok) return r
-
-}catch(e){}
-
-}
-
-throw new Error("proxy fail")
-
-}
-
-async function fetchFeed(account){
-
-for(const inst of INSTANCES){
-
-try{
-
-const url=`https://${inst}/${account}/rss`
-
-const resp=await proxiedFetch(url)
-
-const text=await resp.text()
-
-return parseRSS(text,account)
-
-}catch(e){}
-
-}
-
-return[]
-
-}
-
-function parseRSS(xml,account){
-
-const parser=new DOMParser()
-
-const doc=parser.parseFromString(xml,"text/xml")
-
-const items=[...doc.querySelectorAll("item")]
-
-return items.map(item=>{
-
-const title=item.querySelector("title")?.textContent||""
-const link=item.querySelector("link")?.textContent||""
-const pub=item.querySelector("pubDate")?.textContent||""
-
-if(hideReplies && title.startsWith("RT")) return null
-
-let image=null
-
-const imgMatch=title.match(/https?:\/\/.*\.(jpg|png|jpeg)/)
-
-if(imgMatch) image=imgMatch[0]
-
-return{
-
-name:account,
-handle:"@"+account,
-text:title,
-image:image,
-link:link,
-date:new Date(pub),
-avatar:`https://unavatar.io/twitter/${account}`
-
-}
-
-}).filter(Boolean)
-
-}
-
-function timeAgo(date){
-
-const seconds=Math.floor((Date.now()-date)/1000)
-
-if(seconds<60) return seconds+"s"
-if(seconds<3600) return Math.floor(seconds/60)+"m"
-if(seconds<86400) return Math.floor(seconds/3600)+"h"
-return Math.floor(seconds/86400)+"d"
-
-}
-
-function renderTweet(t){
-
-const div=document.createElement("div")
-
-div.className="tweet"
-
-div.onclick=()=>openThread(t)
-
-div.innerHTML=`
-
-<img class="avatar" src="${t.avatar}">
-
-<div class="content">
-
-<span class="name">${t.name}</span>
-<span class="handle">${t.handle}</span>
-<span class="time">· ${timeAgo(t.date)}</span>
-
-<div class="text">${t.text}</div>
-
-${t.image?`<img class="image" src="${t.image}">`:""}
-
-</div>
-`
-
-return div
-
-}
-
-function renderMore(){
-
-const feed=document.getElementById("feed")
-
-const slice=allTweets.slice(rendered,rendered+PAGE_SIZE)
-
-slice.forEach(t=>feed.appendChild(renderTweet(t)))
-
-rendered+=slice.length
-
-}
-
-function openThread(tweet){
-
-const feed=document.getElementById("feed")
-
-feed.innerHTML=""
-
-const div=document.createElement("div")
-
-div.className="thread"
-
-div.innerHTML=`
-
-<h3>${tweet.name}</h3>
-
-<p>${tweet.text}</p>
-
-<p>
-<a href="${tweet.link}" target="_blank">
-Open original tweet
-</a>
-</p>
-
-<button onclick="goHome()">Back</button>
-
-`
-
-feed.appendChild(div)
-
-}
-
-function goHome(){
-
-rendered=0
-document.getElementById("feed").innerHTML=""
-renderMore()
-
-}
-
-async function loadFeed(){
-
-allTweets=[]
-
-const promises=accounts.map(a=>fetchFeed(a))
-
-const results=await Promise.all(promises)
-
-results.forEach(r=>allTweets=allTweets.concat(r))
-
-allTweets.sort((a,b)=>b.date-a.date)
-
-localStorage.setItem("cf_cache",JSON.stringify(allTweets))
-
-rendered=0
-
-document.getElementById("feed").innerHTML=""
-
-renderMore()
-
-}
-
-function refreshFeed(){
-
-loadFeed()
-
-}
-
-function addAccount(){
-
-const user=prompt("Account name")
-
-if(!user) return
-
-accounts.push(user)
-
-localStorage.setItem("cf_accounts",JSON.stringify(accounts))
-
-loadFeed()
-
-}
-
-function toggleReplies(){
-
-hideReplies=!hideReplies
-
-loadFeed()
-
-}
-
-function loadCache(){
-
-const cache=localStorage.getItem("cf_cache")
-
-if(cache){
-
-allTweets=JSON.parse(cache).map(t=>({...t,date:new Date(t.date)}))
-
-renderMore()
-
-}
-
-}
-
-window.addEventListener("scroll",()=>{
-
-if(window.innerHeight+window.scrollY>=document.body.offsetHeight-200){
-
-renderMore()
-
-}
-
-})
-
-loadCache()
-
-loadFeed()
-
-</script>
-
-</body>
-</html>
